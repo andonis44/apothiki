@@ -478,14 +478,14 @@ function closeModal(){
   }
 }
 
-function openEditModal(id){
+function openEditModal(id, prefillCode){
   const p = id ? products.find(x=>x.id===id) : null;
   const wrap = document.createElement('div');
   wrap.className='overlay';
   wrap.innerHTML = `
     <div class="modal">
       <h2>${p ? 'Επεξεργασία προϊόντος' : 'Νέο προϊόν'}</h2>
-      <div class="field"><label>Κωδικός</label><input id="f_code" value="${p?esc(p.code):''}" placeholder="π.χ. TSM-25KG"/></div>
+      <div class="field"><label>Κωδικός</label><input id="f_code" value="${p?esc(p.code):esc(prefillCode||'')}" placeholder="π.χ. TSM-25KG"/></div>
       <div class="field"><label>Όνομα</label><input id="f_name" value="${p?esc(p.name):''}" placeholder="π.χ. Τσιμέντο 25kg"/></div>
       <div class="field" style="position:relative">
         <label>Κατηγορία</label>
@@ -684,10 +684,18 @@ function handleScanResult(text){
         </div>
       </div>`;
   } else {
+    const scannedCode = text.startsWith('WH:') ? '' : text; // WH: codes are our own internal QR ids, not real barcodes
     holder.innerHTML = `
       <div class="scanresult">
-        Δεν βρέθηκε προϊόν με κωδικό <b>${esc(text)}</b>. Μπορείς να το προσθέσεις με αυτόν τον κωδικό στο "+ Νέο προϊόν".
+        Δεν βρέθηκε προϊόν με κωδικό <b>${esc(text)}</b>.
+        <div class="modalbtns" style="margin-top:10px">
+          <button class="iconbtn signal" id="btnCreateFromScan" style="flex:1">+ Δημιουργία με αυτόν τον κωδικό</button>
+        </div>
       </div>`;
+    document.getElementById('btnCreateFromScan').addEventListener('click', ()=>{
+      closeModal();
+      openEditModal(null, scannedCode);
+    });
   }
 }
 
