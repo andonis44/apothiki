@@ -587,7 +587,7 @@ async function openScanModal(){
   codeReader = new ZXing.BrowserMultiFormatReader();
 
   try{
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const devices = await codeReader.listVideoInputDevices();
     if(!devices || devices.length===0){
       throw Object.assign(new Error('no camera'), { name: 'NotFoundError' });
     }
