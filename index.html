@@ -229,9 +229,9 @@ function iframePostFields(fields){
 function normalizeProduct(p){
   return {
     id: String(p.id),
-    code: p.code || '',
-    name: p.name || '',
-    category: p.category || '',
+    code: p.code != null ? String(p.code) : '',
+    name: p.name != null ? String(p.name) : '',
+    category: p.category != null ? String(p.category) : '',
     qty: Number(p.qty) || 0,
     price: Number(p.price) || 0,
     lowStockAt: Number(p.lowStockAt) || 5
@@ -381,7 +381,7 @@ function stockLevel(p){
 }
 
 function esc(s){
-  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function render(){
