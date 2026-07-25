@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Η Αποθήκη μας</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
@@ -266,7 +266,6 @@ async function storageSet(key, value){
 let products = [];
 let filterCat = 'Όλα';
 let searchTerm = '';
-let scanStream = null;
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -424,7 +423,7 @@ function render(){
 function closeModal(){
   const ov = document.querySelector('.overlay');
   if(ov){
-    if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+    if(codeReader){ try{ codeReader.reset(); }catch(e){} codeReader=null; }
     ov.remove();
   }
 }
@@ -559,14 +558,16 @@ function openQrModal(id){
   });
 }
 
+let codeReader = null;
+
 async function openScanModal(){
   const wrap = document.createElement('div');
   wrap.className='overlay';
   wrap.innerHTML = `
     <div class="modal">
-      <h2>Σάρωση QR</h2>
+      <h2>Σάρωση QR / Barcode</h2>
       <video id="scanvideo" autoplay playsinline muted></video>
-      <div class="scanhint">Δείξε την κάμερα στο QR του προϊόντος.</div>
+      <div class="scanhint">Δείξε την κάμερα στο QR ή στο barcode του προϊόντος.</div>
       <div id="scanresultholder"></div>
       <div class="modalbtns"><button class="iconbtn ghost" id="btnCloseScan">Κλείσιμο</button></div>
     </div>
@@ -576,12 +577,28 @@ async function openScanModal(){
   wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
 
   const video = document.getElementById('scanvideo');
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+
+  if(typeof ZXing === 'undefined'){
+    document.getElementById('scanresultholder').innerHTML =
+      `<div class="scanresult">Η βιβλιοθήκη σάρωσης δεν φορτώθηκε (πρόβλημα σύνδεσης). Δοκίμασε ξανά.</div>`;
+    return;
+  }
+
+  codeReader = new ZXing.BrowserMultiFormatReader();
 
   try{
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = scanStream;
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    if(!devices || devices.length===0){
+      throw Object.assign(new Error('no camera'), { name: 'NotFoundError' });
+    }
+    const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length-1];
+    const deviceId = backCam ? backCam.deviceId : undefined;
+
+    codeReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+      if(result){
+        handleScanResult(result.getText());
+      }
+    });
   }catch(e){
     const name = e && e.name ? e.name : 'ΑγνωστοΣφάλμα';
     let msg = 'Δεν υπήρξε πρόσβαση στην κάμερα (' + name + ').';
@@ -596,38 +613,40 @@ async function openScanModal(){
     }
     document.getElementById('scanresultholder').innerHTML =
       `<div class="scanresult">${esc(msg)}</div>`;
-    return;
+  }
+}
+
+function handleScanResult(text){
+  let p = null;
+  if(text.startsWith('WH:')){
+    const id = text.slice(3);
+    p = products.find(x=>x.id===id);
+  }
+  if(!p){
+    p = products.find(x=>(x.code||'').trim().toLowerCase() === text.trim().toLowerCase());
   }
 
-  function tick(){
-    if(!scanStream) return;
-    if(video.readyState === video.HAVE_ENOUGH_DATA){
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
-      const code = jsQR(imgData.data, imgData.width, imgData.height);
-      if(code && code.data && code.data.startsWith('WH:')){
-        const id = code.data.slice(3);
-        const p = products.find(x=>x.id===id);
-        if(p){
-          scanStream.getTracks().forEach(t=>t.stop()); scanStream=null;
-          document.getElementById('scanresultholder').innerHTML = `
-            <div class="scanresult">
-              <div class="code">${esc(p.code)}</div>
-              <div class="name" style="margin-bottom:6px">${esc(p.name)}</div>
-              <div class="row">
-                <div class="qty">${p.qty}<span>Τεμάχια</span></div>
-                <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
-              </div>
-            </div>`;
-          video.style.display='none';
-          return;
-        }
-      }
-    }
-    requestAnimationFrame(tick);
+  if(codeReader){ try{ codeReader.reset(); }catch(e){} codeReader=null; }
+  const video = document.getElementById('scanvideo');
+  if(video) video.style.display='none';
+
+  const holder = document.getElementById('scanresultholder');
+  if(p){
+    holder.innerHTML = `
+      <div class="scanresult">
+        <div class="code">${esc(p.code)}</div>
+        <div class="name" style="margin-bottom:6px">${esc(p.name)}</div>
+        <div class="row">
+          <div class="qty">${p.qty}<span>Τεμάχια</span></div>
+          <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
+        </div>
+      </div>`;
+  } else {
+    holder.innerHTML = `
+      <div class="scanresult">
+        Δεν βρέθηκε προϊόν με κωδικό <b>${esc(text)}</b>. Μπορείς να το προσθέσεις με αυτόν τον κωδικό στο "+ Νέο προϊόν".
+      </div>`;
   }
-  requestAnimationFrame(tick);
 }
 
 loadProducts();
