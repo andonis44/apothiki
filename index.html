@@ -161,8 +161,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbylLR_wSZkwPGRWiMi9N2ytrYC3LoCX4LpNPV1uy4OYD1ArgR46imRJNIHpXiF3TM0RoA/exec';
 const hasCloudStorage = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
 
-// JSONP GET — avoids CORS entirely, works from file:// pages too
-function jsonpGet(key, timeoutMs){
+// Generic JSONP call — avoids CORS entirely, works from file:// pages too
+function jsonpCall(params, timeoutMs){
   return new Promise((resolve, reject)=>{
     const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*100000);
     let done = false;
@@ -184,13 +184,16 @@ function jsonpGet(key, timeoutMs){
       if(done) return; done = true;
       cleanup(); reject(new Error('jsonp load error'));
     };
-    script.src = APPS_SCRIPT_URL + '?key=' + encodeURIComponent(key) + '&callback=' + cbName;
+    const qs = Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
+    script.src = APPS_SCRIPT_URL + '?' + qs + '&callback=' + cbName;
     document.body.appendChild(script);
   });
 }
 
+function jsonpList(timeoutMs){ return jsonpCall({ action: 'list' }, timeoutMs); }
+
 // Hidden-iframe form POST — avoids CORS entirely (plain form navigation, not fetch/XHR)
-function iframePost(key, value){
+function iframePostFields(fields){
   return new Promise((resolve)=>{
     const frameName = 'post_frame_' + Date.now() + '_' + Math.floor(Math.random()*100000);
     const iframe = document.createElement('iframe');
@@ -204,13 +207,13 @@ function iframePost(key, value){
     form.target = frameName;
     form.style.display = 'none';
 
-    const inputKey = document.createElement('input');
-    inputKey.name = 'key'; inputKey.value = key;
-    const inputValue = document.createElement('input');
-    inputValue.name = 'value'; inputValue.value = value;
+    Object.keys(fields).forEach(k=>{
+      const input = document.createElement('input');
+      input.name = k;
+      input.value = fields[k] == null ? '' : String(fields[k]);
+      form.appendChild(input);
+    });
 
-    form.appendChild(inputKey);
-    form.appendChild(inputValue);
     document.body.appendChild(form);
     form.submit();
 
@@ -223,11 +226,20 @@ function iframePost(key, value){
   });
 }
 
+function normalizeProduct(p){
+  return {
+    id: String(p.id),
+    code: p.code || '',
+    name: p.name || '',
+    category: p.category || '',
+    qty: Number(p.qty) || 0,
+    price: Number(p.price) || 0,
+    lowStockAt: Number(p.lowStockAt) || 5
+  };
+}
+
+// Fallback storage (only used when APPS_SCRIPT_URL isn't set) — whole-array blob
 async function storageGet(key){
-  if(APPS_SCRIPT_URL){
-    const data = await jsonpGet(key);
-    return (data && data.value != null) ? { key, value: data.value } : null;
-  }
   if(hasCloudStorage){
     return await window.storage.get(key, true);
   }
@@ -240,18 +252,6 @@ async function storageGet(key){
 }
 
 async function storageSet(key, value){
-  if(APPS_SCRIPT_URL){
-    await iframePost(key, value);
-    // verify the write actually landed by reading it back
-    try{
-      const verify = await jsonpGet(key, 8000);
-      if(verify && verify.value === value){
-        try{ localStorage.setItem(key, value); }catch(e){}
-        return { key, value };
-      }
-    }catch(e){}
-    return null;
-  }
   if(hasCloudStorage){
     return await window.storage.set(key, value, true);
   }
@@ -263,43 +263,9 @@ async function storageSet(key, value){
   }
 }
 
-let products = [];
-let filterCat = 'Όλα';
-let searchTerm = '';
-
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-
-let loadFailed = false;
-
-async function loadProducts(){
-  loadFailed = false;
+async function saveProductsArrayFallback(){
   try{
-    const res = await withTimeout(storageGet('products'), 8000);
-    products = res && res.value ? JSON.parse(res.value) : [];
-  }catch(e){
-    // key not existing yet is normal (empty warehouse); anything else, flag it
-    products = [];
-    if(!String(e && e.message).toLowerCase().includes('not found')){
-      loadFailed = true;
-    }
-  }
-  render();
-}
-
-function withTimeout(promise, ms){
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(()=>reject(new Error('timeout')), ms))
-  ]);
-}
-
-async function saveProducts(){
-  // returns true only if the write is confirmed to have succeeded
-  try{
-    const result = await withTimeout(
-      storageSet('products', JSON.stringify(products)),
-      8000
-    );
+    const result = await withTimeout(storageSet('products', JSON.stringify(products)), 8000);
     if(!result){
       showToast('⚠ Δεν αποθηκεύτηκε — δοκίμασε ξανά.');
       return false;
@@ -309,6 +275,90 @@ async function saveProducts(){
     showToast('⚠ Δεν αποθηκεύτηκε (πρόβλημα σύνδεσης) — δοκίμασε ξανά.');
     return false;
   }
+}
+
+// Save/delete a single product as its own row (Apps Script path) — no cell-size limit
+async function persistUpsert(data, isEdit, oldId){
+  if(APPS_SCRIPT_URL){
+    try{
+      await iframePostFields({
+        action: 'upsert',
+        id: data.id, code: data.code, name: data.name, category: data.category,
+        qty: data.qty, price: data.price, lowStockAt: data.lowStockAt
+      });
+      const verify = await withTimeout(jsonpList(), 8000);
+      const found = verify && Array.isArray(verify.products) && verify.products.find(x=>String(x.id)===String(data.id));
+      if(found){
+        products = isEdit ? products.map(x=>x.id===oldId?data:x) : [...products, data];
+        return true;
+      }
+      return false;
+    }catch(e){
+      return false;
+    }
+  }
+  const backup = products;
+  products = isEdit ? products.map(x=>x.id===oldId?data:x) : [...products, data];
+  const ok = await saveProductsArrayFallback();
+  if(!ok){ products = backup; }
+  return ok;
+}
+
+async function persistDelete(id){
+  if(APPS_SCRIPT_URL){
+    try{
+      await iframePostFields({ action: 'delete', id: id });
+      const verify = await withTimeout(jsonpList(), 8000);
+      const stillThere = verify && Array.isArray(verify.products) && verify.products.some(x=>String(x.id)===String(id));
+      if(!stillThere){
+        products = products.filter(x=>x.id!==id);
+        return true;
+      }
+      return false;
+    }catch(e){
+      return false;
+    }
+  }
+  const backup = products;
+  products = products.filter(x=>x.id!==id);
+  const ok = await saveProductsArrayFallback();
+  if(!ok){ products = backup; }
+  return ok;
+}
+
+let products = [];
+let filterCat = 'Όλα';
+let searchTerm = '';
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+let loadFailed = false;
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(()=>reject(new Error('timeout')), ms))
+  ]);
+}
+
+async function loadProducts(){
+  loadFailed = false;
+  try{
+    if(APPS_SCRIPT_URL){
+      const data = await withTimeout(jsonpList(), 8000);
+      products = (data && Array.isArray(data.products)) ? data.products.map(normalizeProduct) : [];
+    } else {
+      const res = await withTimeout(storageGet('products'), 8000);
+      products = res && res.value ? JSON.parse(res.value) : [];
+    }
+  }catch(e){
+    // key not existing yet is normal (empty warehouse); anything else, flag it
+    products = [];
+    if(!String(e && e.message).toLowerCase().includes('not found')){
+      loadFailed = true;
+    }
+  }
+  render();
 }
 
 function showToast(msg){
@@ -479,17 +529,15 @@ function openEditModal(id){
 
   if(p){
     document.getElementById('btnDelete').addEventListener('click', async ()=>{
-      const backup = products;
-      products = products.filter(x=>x.id!==id);
       const btn = document.getElementById('btnDelete');
       btn.disabled = true; btn.textContent = 'Διαγραφή...';
-      const ok = await saveProducts();
+      const ok = await persistDelete(id);
       if(ok){
         closeModal(); render();
         showToast('Το προϊόν διαγράφηκε.');
       } else {
-        products = backup; // revert, nothing was actually persisted
         btn.disabled = false; btn.textContent = 'Διαγραφή';
+        showToast('⚠ Δεν διαγράφηκε — δοκίμασε ξανά.');
       }
     });
   }
@@ -505,21 +553,15 @@ function openEditModal(id){
       price: parseFloat(document.getElementById('f_price').value) || 0,
       lowStockAt: parseFloat(document.getElementById('f_low').value) || 5,
     };
-    const backup = products;
-    if(p){
-      products = products.map(x=>x.id===id?data:x);
-    } else {
-      products = [...products, data];
-    }
     const btn = document.getElementById('btnSave');
     btn.disabled = true; btn.textContent = 'Αποθήκευση...';
-    const ok = await saveProducts();
+    const ok = await persistUpsert(data, !!p, p ? p.id : null);
     if(ok){
       closeModal(); render();
       showToast('Αποθηκεύτηκε.');
     } else {
-      products = backup; // revert local state — nothing was actually persisted
       btn.disabled = false; btn.textContent = 'Αποθήκευση';
+      showToast('⚠ Δεν αποθηκεύτηκε — δοκίμασε ξανά.');
       // leave the modal open with the user's input intact so they can retry
     }
   });
