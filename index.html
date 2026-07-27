@@ -638,7 +638,7 @@ function openQrModal(id){
   `;
   document.body.appendChild(wrap);
   new QRCode(document.getElementById('qrcanvas-holder'), {
-    text: 'WH:'+p.id, width:180, height:180
+    text: p.code, width:180, height:180
   });
   document.getElementById('btnClose').addEventListener('click', closeModal);
   wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
@@ -703,7 +703,7 @@ function printLabel(p, size){
       </div>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       <script>
-        new QRCode(document.getElementById('qr'), { text: 'WH:${p.id}', width: ${qrPx}, height: ${qrPx} });
+        new QRCode(document.getElementById('qr'), { text: ${JSON.stringify(p.code)}, width: ${qrPx}, height: ${qrPx} });
         setTimeout(()=>{ window.print(); }, 300);
       <\/script>
     </body>
