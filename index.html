@@ -438,6 +438,7 @@ function render(){
                 <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
               </div>
               <div class="cardbtns">
+                <button data-sell="${p.id}" style="background:var(--ok);color:#fff;border-color:var(--ok);">Πούλησα</button>
                 <button data-qr="${p.id}">QR</button>
                 <button data-edit="${p.id}">Επεξεργασία</button>
               </div>
@@ -467,6 +468,49 @@ function render(){
   });
   document.querySelectorAll('[data-edit]').forEach(el=>{
     el.addEventListener('click', ()=>openEditModal(el.dataset.edit));
+  });
+  document.querySelectorAll('[data-sell]').forEach(el=>{
+    el.addEventListener('click', ()=>openSellModal(el.dataset.sell));
+  });
+}
+
+function openSellModal(id){
+  const p = products.find(x=>x.id===id);
+  if(!p) return;
+  const wrap = document.createElement('div');
+  wrap.className='overlay';
+  wrap.innerHTML = `
+    <div class="modal">
+      <h2>Πούλησα</h2>
+      <div class="qrmeta" style="margin-bottom:10px;text-align:left">${esc(p.code)} — ${esc(p.name)}<br>Τρέχον απόθεμα: <b>${p.qty}</b></div>
+      <div class="field"><label>Ποσότητα που πούλησες</label>
+        <input id="sellAmount" type="number" value="1" min="1"/>
+      </div>
+      <div class="modalbtns">
+        <button class="iconbtn ghost" id="btnCancelSell">Άκυρο</button>
+        <button class="iconbtn signal" id="btnConfirmSell">Αφαίρεση από απόθεμα</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  document.getElementById('btnCancelSell').addEventListener('click', closeModal);
+  wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
+  const amountInput = document.getElementById('sellAmount');
+  amountInput.focus(); amountInput.select();
+  document.getElementById('btnConfirmSell').addEventListener('click', async ()=>{
+    const amt = parseFloat(amountInput.value) || 0;
+    if(amt<=0){ showToast('Βάλε μια ποσότητα μεγαλύτερη από 0.'); return; }
+    const btn = document.getElementById('btnConfirmSell');
+    btn.disabled = true; btn.textContent = 'Ενημέρωση...';
+    const newQty = Math.max(0, p.qty - amt);
+    const data = { ...p, qty: newQty };
+    const ok = await persistUpsert(data, true, p.id);
+    if(ok){
+      closeModal(); render();
+      showToast('Ενημερώθηκε το απόθεμα.');
+    } else {
+      btn.disabled = false; btn.textContent = 'Αφαίρεση από απόθεμα';
+      showToast('⚠ Δεν ενημερώθηκε — δοκίμασε ξανά.');
+    }
   });
 }
 
@@ -628,22 +672,22 @@ function printLabel(p, size){
         overflow:hidden;
       }
       .name{
-        font-size:${isSmall?'2mm':'4.2mm'}; line-height:1.15; font-weight:600;
+        font-size:${isSmall?'2mm':'5mm'}; line-height:1.15; font-weight:600;
         display:${isSmall?'none':'block'};
-        overflow:hidden; max-height:${isSmall?'0':'9mm'};
+        overflow:hidden; max-height:${isSmall?'0':'10mm'};
       }
       .bottomrow{
         display:flex; align-items:center; justify-content:space-between; gap:${isSmall?'0.8mm':'2mm'};
       }
       .leftgroup{ display:flex; align-items:center; gap:${isSmall?'0.8mm':'2mm'}; min-width:0; }
       #qr{ flex:none; }
-      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'15mm'} !important; height:${isSmall?'9mm':'15mm'} !important; }
+      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'16mm'} !important; height:${isSmall?'9mm':'16mm'} !important; }
       .code{
-        font-size:${isSmall?'2mm':'4mm'}; font-weight:bold; letter-spacing:0.02em;
+        font-size:${isSmall?'2mm':'4.5mm'}; font-weight:bold; letter-spacing:0.02em;
         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       }
       .price{
-        font-size:${isSmall?'2.6mm':'10mm'}; font-weight:bold; line-height:1;
+        font-size:${isSmall?'2.6mm':'12mm'}; font-weight:bold; line-height:1;
         flex:none; text-align:right;
       }
     </style>
@@ -747,10 +791,35 @@ function handleScanResult(text){
         <div class="code">${esc(p.code)}</div>
         <div class="name" style="margin-bottom:6px">${esc(p.name)}</div>
         <div class="row">
-          <div class="qty">${p.qty}<span>Τεμάχια</span></div>
+          <div class="qty" id="scanQtyDisplay">${p.qty}<span>Τεμάχια</span></div>
           <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
         </div>
+        <div style="display:flex;gap:6px;margin-top:10px;align-items:stretch;">
+          <input id="sellAmountScan" type="number" value="1" min="1" style="width:64px;padding:8px;border:1.5px solid var(--line);border-radius:5px;font-family:'IBM Plex Mono';font-size:15px;text-align:center;"/>
+          <button class="iconbtn" id="btnSellScan" style="flex:1;background:var(--ok);border-color:var(--ok);">Πούλησα</button>
+        </div>
       </div>`;
+    document.getElementById('btnSellScan').addEventListener('click', async ()=>{
+      const amountInput = document.getElementById('sellAmountScan');
+      const amt = parseFloat(amountInput.value) || 0;
+      if(amt<=0) return;
+      const btn = document.getElementById('btnSellScan');
+      btn.disabled = true; btn.textContent = '...';
+      const newQty = Math.max(0, p.qty - amt);
+      const data = { ...p, qty: newQty };
+      const ok = await persistUpsert(data, true, p.id);
+      if(ok){
+        p.qty = newQty;
+        document.getElementById('scanQtyDisplay').innerHTML = `${newQty}<span>Τεμάχια</span>`;
+        amountInput.value = 1;
+        btn.disabled = false; btn.textContent = 'Πούλησα';
+        showToast('Ενημερώθηκε το απόθεμα.');
+        render();
+      } else {
+        btn.disabled = false; btn.textContent = 'Πούλησα';
+        showToast('⚠ Δεν ενημερώθηκε — δοκίμασε ξανά.');
+      }
+    });
   } else {
     const scannedCode = text.startsWith('WH:') ? '' : text; // WH: codes are our own internal QR ids, not real barcodes
     holder.innerHTML = `
