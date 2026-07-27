@@ -609,7 +609,7 @@ function printLabel(p, size){
   // physical label dimensions in mm (landscape)
   const pageW = isSmall ? 24 : 89;
   const pageH = isSmall ? 12 : 36;
-  const qrPx = isSmall ? 80 : 260; // rendered small, then scaled down by CSS to fit the physical mm size
+  const qrPx = isSmall ? 80 : 220; // rendered small, then scaled down by CSS to fit the physical mm size
 
   const win = window.open('', '_blank');
   win.document.write(`
@@ -621,26 +621,38 @@ function printLabel(p, size){
       html, body { margin:0; padding:0; }
       body{
         width:${pageW}mm; height:${pageH}mm;
-        display:flex; align-items:center; box-sizing:border-box;
+        display:flex; flex-direction:column; justify-content:space-between;
+        box-sizing:border-box;
         font-family: Arial, sans-serif;
         padding: ${isSmall ? '0.5mm' : '2mm'};
-        gap: ${isSmall ? '1mm' : '2mm'};
         overflow:hidden;
       }
+      .name{
+        font-size:${isSmall?'2mm':'3.3mm'}; line-height:1.15; font-weight:600;
+        display:${isSmall?'none':'block'};
+        overflow:hidden; max-height:${isSmall?'0':'7.5mm'};
+      }
+      .price{
+        font-size:${isSmall?'2.6mm':'7.5mm'}; font-weight:bold; line-height:1;
+        margin:${isSmall?'0.3mm 0':'1mm 0'};
+      }
+      .bottomrow{
+        display:flex; align-items:flex-end; gap:${isSmall?'0.8mm':'2mm'};
+      }
       #qr{ flex:none; }
-      #qr img, #qr canvas, #qr table { width:${isSmall?'11mm':'32mm'} !important; height:${isSmall?'11mm':'32mm'} !important; }
-      .info{ flex:1; min-width:0; overflow:hidden; }
-      .code{ font-size:${isSmall?'2.6mm':'4mm'}; font-weight:bold; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .name{ font-size:${isSmall?'0mm':'3.2mm'}; line-height:1.15; margin-top:0.5mm; display:${isSmall?'none':'block'}; overflow:hidden; }
-      .price{ font-size:${isSmall?'3mm':'6mm'}; font-weight:bold; margin-top:${isSmall?'0':'1mm'}; white-space:nowrap; }
+      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'13mm'} !important; height:${isSmall?'9mm':'13mm'} !important; }
+      .code{
+        font-size:${isSmall?'2mm':'3mm'}; font-weight:bold; letter-spacing:0.02em;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      }
     </style>
     </head>
     <body>
-      <div id="qr"></div>
-      <div class="info">
+      <div class="name">${esc(p.name)}</div>
+      <div class="price">${Number(p.price||0).toFixed(2)}€</div>
+      <div class="bottomrow">
+        <div id="qr"></div>
         <div class="code">${esc(p.code)}</div>
-        <div class="name">${esc(p.name)}</div>
-        <div class="price">${Number(p.price||0).toFixed(2)}€</div>
       </div>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       <script>
