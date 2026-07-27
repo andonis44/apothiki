@@ -632,27 +632,30 @@ function printLabel(p, size){
         display:${isSmall?'none':'block'};
         overflow:hidden; max-height:${isSmall?'0':'7.5mm'};
       }
-      .price{
-        font-size:${isSmall?'2.6mm':'7.5mm'}; font-weight:bold; line-height:1;
-        margin:${isSmall?'0.3mm 0':'1mm 0'};
-      }
       .bottomrow{
-        display:flex; align-items:flex-end; gap:${isSmall?'0.8mm':'2mm'};
+        display:flex; align-items:center; justify-content:space-between; gap:${isSmall?'0.8mm':'2mm'};
       }
+      .leftgroup{ display:flex; align-items:center; gap:${isSmall?'0.8mm':'2mm'}; min-width:0; }
       #qr{ flex:none; }
       #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'13mm'} !important; height:${isSmall?'9mm':'13mm'} !important; }
       .code{
         font-size:${isSmall?'2mm':'3mm'}; font-weight:bold; letter-spacing:0.02em;
         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       }
+      .price{
+        font-size:${isSmall?'2.6mm':'8mm'}; font-weight:bold; line-height:1;
+        flex:none; text-align:right;
+      }
     </style>
     </head>
     <body>
       <div class="name">${esc(p.name)}</div>
-      <div class="price">${Number(p.price||0).toFixed(2)}€</div>
       <div class="bottomrow">
-        <div id="qr"></div>
-        <div class="code">${esc(p.code)}</div>
+        <div class="leftgroup">
+          <div id="qr"></div>
+          <div class="code">${esc(p.code)}</div>
+        </div>
+        <div class="price">${Number(p.price||0).toFixed(2)}€</div>
       </div>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       <script>
