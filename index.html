@@ -574,10 +574,17 @@ function openQrModal(id){
   wrap.className='overlay';
   wrap.innerHTML = `
     <div class="modal">
-      <h2>QR ετικέτα</h2>
+      <h2>Ετικέτα προϊόντος</h2>
       <div class="qrwrap">
         <div id="qrcanvas-holder"></div>
         <div class="qrmeta">${esc(p.code)} — ${esc(p.name)}</div>
+      </div>
+      <div class="field">
+        <label>Μέγεθος ετικέτας (DYMO)</label>
+        <select id="labelSize" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:5px;font-family:'IBM Plex Sans';font-size:15px;">
+          <option value="large">Μεγάλη — 89 × 36 mm</option>
+          <option value="small">Μικρή διπλή — 24 × 12 mm</option>
+        </select>
       </div>
       <div class="modalbtns">
         <button class="iconbtn ghost" id="btnClose">Κλείσιμο</button>
@@ -592,12 +599,58 @@ function openQrModal(id){
   document.getElementById('btnClose').addEventListener('click', closeModal);
   wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
   document.getElementById('btnPrint').addEventListener('click', ()=>{
-    const holder = document.getElementById('qrcanvas-holder').innerHTML;
-    const win = window.open('', '_blank');
-    win.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:20px">
-      ${holder}<div style="margin-top:8px;font-size:14px">${esc(p.code)} — ${esc(p.name)}</div>
-      <script>window.print()<\/script></body></html>`);
+    const size = document.getElementById('labelSize').value;
+    printLabel(p, size);
   });
+}
+
+function printLabel(p, size){
+  const isSmall = size === 'small';
+  // physical label dimensions in mm (landscape)
+  const pageW = isSmall ? 24 : 89;
+  const pageH = isSmall ? 12 : 36;
+  const qrPx = isSmall ? 80 : 260; // rendered small, then scaled down by CSS to fit the physical mm size
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html>
+    <head>
+    <meta charset="UTF-8">
+    <style>
+      @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
+      html, body { margin:0; padding:0; }
+      body{
+        width:${pageW}mm; height:${pageH}mm;
+        display:flex; align-items:center; box-sizing:border-box;
+        font-family: Arial, sans-serif;
+        padding: ${isSmall ? '0.5mm' : '2mm'};
+        gap: ${isSmall ? '1mm' : '2mm'};
+        overflow:hidden;
+      }
+      #qr{ flex:none; }
+      #qr img, #qr canvas, #qr table { width:${isSmall?'11mm':'32mm'} !important; height:${isSmall?'11mm':'32mm'} !important; }
+      .info{ flex:1; min-width:0; overflow:hidden; }
+      .code{ font-size:${isSmall?'2.6mm':'4mm'}; font-weight:bold; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .name{ font-size:${isSmall?'0mm':'3.2mm'}; line-height:1.15; margin-top:0.5mm; display:${isSmall?'none':'block'}; overflow:hidden; }
+      .price{ font-size:${isSmall?'3mm':'6mm'}; font-weight:bold; margin-top:${isSmall?'0':'1mm'}; white-space:nowrap; }
+    </style>
+    </head>
+    <body>
+      <div id="qr"></div>
+      <div class="info">
+        <div class="code">${esc(p.code)}</div>
+        <div class="name">${esc(p.name)}</div>
+        <div class="price">${Number(p.price||0).toFixed(2)}€</div>
+      </div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+      <script>
+        new QRCode(document.getElementById('qr'), { text: 'WH:${p.id}', width: ${qrPx}, height: ${qrPx} });
+        setTimeout(()=>{ window.print(); }, 300);
+      <\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 let codeReader = null;
