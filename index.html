@@ -628,22 +628,22 @@ function printLabel(p, size){
         overflow:hidden;
       }
       .name{
-        font-size:${isSmall?'2mm':'3.3mm'}; line-height:1.15; font-weight:600;
+        font-size:${isSmall?'2mm':'4.2mm'}; line-height:1.15; font-weight:600;
         display:${isSmall?'none':'block'};
-        overflow:hidden; max-height:${isSmall?'0':'7.5mm'};
+        overflow:hidden; max-height:${isSmall?'0':'9mm'};
       }
       .bottomrow{
         display:flex; align-items:center; justify-content:space-between; gap:${isSmall?'0.8mm':'2mm'};
       }
       .leftgroup{ display:flex; align-items:center; gap:${isSmall?'0.8mm':'2mm'}; min-width:0; }
       #qr{ flex:none; }
-      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'13mm'} !important; height:${isSmall?'9mm':'13mm'} !important; }
+      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'15mm'} !important; height:${isSmall?'9mm':'15mm'} !important; }
       .code{
-        font-size:${isSmall?'2mm':'3mm'}; font-weight:bold; letter-spacing:0.02em;
+        font-size:${isSmall?'2mm':'4mm'}; font-weight:bold; letter-spacing:0.02em;
         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       }
       .price{
-        font-size:${isSmall?'2.6mm':'8mm'}; font-weight:bold; line-height:1;
+        font-size:${isSmall?'2.6mm':'10mm'}; font-weight:bold; line-height:1;
         flex:none; text-align:right;
       }
     </style>
