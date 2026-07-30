@@ -1,842 +1,958 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="el">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Η Αποθήκη μας</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+<title>ΠΕΛΛΕΤ — Διαχείριση</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root{
-  --bg:#F2F0EB;
-  --surface:#FFFFFF;
-  --ink:#23241F;
-  --steel:#55606B;
-  --signal:#E8A33D;
-  --danger:#C1443D;
-  --ok:#3F7A5D;
-  --line:#D9D3C6;
+  --paper:#E6E6E3;
+  --surface:#FBFBFA;
+  --surface-2:#EEEEEB;
+  --ink:#242422;
+  --ink-soft:#6C6C68;
+  --pine:#45453F;
+  --pine-deep:#242422;
+  --rust:#A8431D;
+  --rust-deep:#7E2F12;
+  --birch:#8F8F87;
+  --line:#D6D6D1;
+  --line-soft:#E4E4E0;
+  --shadow: 0 1px 0 rgba(36,36,34,0.06);
 }
 *{box-sizing:border-box;}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;}
-#app{max-width:920px;margin:0 auto;padding:18px 16px 80px;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(36,36,34,0.05), transparent),
+    var(--paper);
+  color:var(--ink);
+  font-family:'Work Sans',sans-serif;
+  min-height:100vh;
+}
+h1,h2,h3,.display{font-family:'Fraunces',serif;}
+.mono{font-family:'IBM Plex Mono',monospace;}
 
-/* header — bin tag banner */
-.banner{
-  background:var(--ink);color:var(--bg);border-radius:6px;
-  padding:16px 18px;margin-bottom:16px;position:relative;overflow:hidden;
-}
-.banner::before{
-  content:"";position:absolute;top:0;bottom:0;left:0;width:10px;background:var(--signal);
-}
-.banner h1{
-  font-family:'Oswald',sans-serif;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.04em;font-size:26px;margin:0 0 2px 8px;
-}
-.banner p{
-  margin:0 0 0 8px;font-family:'IBM Plex Mono',monospace;font-size:12px;
-  letter-spacing:0.08em;color:#D9D3C6;text-transform:uppercase;
-}
+#app{max-width:1040px;margin:0 auto;padding:0 16px 64px;}
 
-/* toolbar */
-.toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
-.searchrow{display:flex;gap:8px;}
-.searchrow input{
-  flex:1;padding:11px 12px;border:1.5px solid var(--line);border-radius:5px;
-  font-family:'IBM Plex Sans';font-size:15px;background:var(--surface);
+/* ---------- Header ---------- */
+.hero{
+  padding:28px 4px 18px;
+  border-bottom:2px solid var(--ink);
+  margin-bottom:18px;
+  display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;
 }
-.searchrow input:focus{outline:2px solid var(--steel);outline-offset:1px;}
-.iconbtn{
-  border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);
-  border-radius:5px;padding:0 14px;font-family:'IBM Plex Mono';font-size:13px;
-  font-weight:600;cursor:pointer;white-space:nowrap;
+.hero-title{font-size:34px;font-weight:700;letter-spacing:-0.01em;margin:0;color:var(--ink);}
+.hero-title .accent{color:var(--birch);}
+.hero-sub{font-size:13px;color:var(--ink-soft);margin-top:4px;}
+.hero-date{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-soft);text-align:right;}
+
+/* ---------- Tabs ---------- */
+.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.tab{
+  font-family:'Work Sans',sans-serif;font-weight:600;font-size:13.5px;
+  padding:10px 16px;background:none;border:none;cursor:pointer;color:var(--ink-soft);
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;
+  white-space:nowrap;
 }
-.iconbtn:focus-visible{outline:2px solid var(--signal);outline-offset:2px;}
-.iconbtn.ghost{background:var(--surface);color:var(--ink);}
+.tab:hover{color:var(--ink);}
+.tab.active{color:var(--pine-deep);border-bottom-color:var(--pine);}
 
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
-.chip{
-  flex:none;padding:6px 12px;border-radius:20px;border:1.5px solid var(--line);
-  background:var(--surface);font-family:'IBM Plex Mono';font-size:12px;font-weight:600;
-  cursor:pointer;text-transform:uppercase;letter-spacing:0.03em;color:var(--steel);
-}
-.chip.active{background:var(--ink);border-color:var(--ink);color:var(--bg);}
+.view{display:none;}
+.view.active{display:block;animation:fade .2s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:none;}}
 
-.actionrow{display:flex;gap:8px;margin-bottom:16px;}
-.actionrow .iconbtn{flex:1;padding:12px;text-align:center;}
-.actionrow .iconbtn.signal{background:var(--signal);border-color:var(--signal);color:var(--ink);}
-
-/* product grid — shelf tags */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+/* ---------- Cards ---------- */
 .card{
-  background:var(--surface);border-radius:6px;border:1px solid var(--line);
-  padding:0;position:relative;overflow:hidden;display:flex;
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:16px;box-shadow:var(--shadow);
 }
-.card .bar{width:8px;flex:none;}
-.card .body{padding:12px 14px;flex:1;min-width:0;}
-.card .code{
-  font-family:'IBM Plex Mono';font-size:11px;color:var(--steel);letter-spacing:0.04em;
-  text-transform:uppercase;
-}
-.card .name{
-  font-family:'IBM Plex Sans';font-weight:600;font-size:16px;margin:2px 0 8px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.card .row{display:flex;justify-content:space-between;align-items:flex-end;}
-.card .qty{font-family:'Oswald';font-weight:700;font-size:26px;line-height:1;}
-.card .qty span{font-family:'IBM Plex Mono';font-size:11px;font-weight:500;color:var(--steel);display:block;text-transform:uppercase;}
-.card .price{font-family:'IBM Plex Mono';font-size:15px;font-weight:600;color:var(--ink);text-align:right;}
-.card .price span{display:block;font-size:10px;color:var(--steel);text-transform:uppercase;font-weight:500;}
-.card .cardbtns{display:flex;gap:6px;margin-top:10px;}
-.card .cardbtns button{
-  flex:1;border:1px solid var(--line);background:var(--bg);border-radius:4px;
-  padding:6px;font-family:'IBM Plex Mono';font-size:11px;font-weight:600;cursor:pointer;
-  text-transform:uppercase;color:var(--steel);
+.section-title{
+  font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);
+  font-weight:600;margin:0 0 12px;
 }
 
-.empty{
-  text-align:center;padding:60px 20px;color:var(--steel);font-family:'IBM Plex Sans';
+/* ---------- Dashboard product cards ---------- */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:20px;}
+.stock-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;
 }
-.empty b{display:block;font-family:'Oswald';font-size:20px;color:var(--ink);margin-bottom:6px;text-transform:uppercase;}
+.stock-card .pname{font-family:'Fraunces',serif;font-weight:600;font-size:16px;margin:0 0 8px;}
+.stock-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+.stock-row b{color:var(--ink);font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.gauge{
+  height:8px;border-radius:4px;background:var(--line-soft);margin:10px 0 6px;overflow:hidden;
+  display:flex;
+}
+.gauge-fill{height:100%;background:var(--pine);transition:width .3s;}
+.gauge-fill.low{background:var(--rust);}
+.stock-neg{color:var(--rust-deep);font-weight:600;}
+.cell-strong{font-weight:700;font-size:13.5px;color:var(--ink);}
+.balance-pill{display:inline-block;font-weight:700;background:#F2DED4;color:var(--rust-deep);padding:3px 10px;border-radius:20px;font-size:12.5px;}
+.pellet-dots{position:absolute;top:12px;right:12px;font-size:10px;color:var(--birch);opacity:.5;letter-spacing:2px;}
 
-/* modal */
-.overlay{
-  position:fixed;inset:0;background:rgba(35,36,31,0.55);display:flex;
-  align-items:center;justify-content:center;padding:16px;z-index:50;
+/* ---------- Summary strip ---------- */
+.summary-strip{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+.summary-item{flex:1;min-width:140px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px 14px;}
+.summary-item .label{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;}
+.summary-item .value{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:3px;}
+.summary-item .value.rust{color:var(--rust-deep);}
+.summary-item .value.pine{color:var(--pine-deep);}
+
+/* ---------- Tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink-soft);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--ink);
 }
-.modal{
-  background:var(--surface);border-radius:8px;padding:20px;max-width:420px;width:100%;
-  max-height:90vh;overflow-y:auto;
+tbody td{padding:8px 8px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+tbody tr:hover{background:var(--surface-2);}
+.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
+
+/* ---------- Badges ---------- */
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap;}
+.badge.pending{background:#E3E3DE;color:#4A4A46;}
+.badge.partial{background:#D9D9D4;color:var(--pine-deep);}
+.badge.delivered{background:#DCDCD8;color:var(--pine-deep);}
+.badge.cancelled{background:#EFD9D2;color:var(--rust-deep);}
+.badge.none{background:var(--line-soft);color:var(--ink-soft);}
+
+/* ---------- Buttons ---------- */
+button{font-family:'Work Sans',sans-serif;cursor:pointer;}
+.btn{
+  background:var(--pine);color:#fff;border:none;border-radius:5px;padding:9px 16px;
+  font-weight:600;font-size:13px;transition:background .15s;
 }
-.modal h2{
-  font-family:'Oswald';text-transform:uppercase;font-size:19px;margin:0 0 14px;
-  border-bottom:2px solid var(--ink);padding-bottom:8px;
+.btn:hover{background:var(--pine-deep);}
+.btn.secondary{background:none;border:1px solid var(--ink);color:var(--ink);}
+.btn.secondary:hover{background:var(--surface-2);}
+.btn.danger{background:none;border:1px solid var(--rust);color:var(--rust-deep);}
+.btn.danger:hover{background:#F5E5DE;}
+.btn.small{padding:5px 10px;font-size:12px;border-radius:4px;}
+.icon-btn{background:none;border:none;color:var(--ink-soft);font-size:15px;padding:3px 6px;border-radius:4px;}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink);}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+.toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
+
+select,input,textarea{
+  font-family:'Work Sans',sans-serif;font-size:13.5px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:5px;background:var(--surface);color:var(--ink);width:100%;
 }
+select:focus,input:focus,textarea:focus{outline:2px solid var(--birch);outline-offset:1px;}
+label{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px;}
 .field{margin-bottom:12px;}
-.field label{
-  display:block;font-family:'IBM Plex Mono';font-size:11px;text-transform:uppercase;
-  color:var(--steel);margin-bottom:4px;letter-spacing:0.03em;
-}
-.field input{
-  width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:5px;
-  font-family:'IBM Plex Sans';font-size:15px;
-}
-.field input:focus{outline:2px solid var(--steel);outline-offset:1px;}
-.modalbtns{display:flex;gap:8px;margin-top:16px;}
-.modalbtns .iconbtn{flex:1;text-align:center;padding:11px;}
-.modalbtns .danger{background:var(--danger);border-color:var(--danger);}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
-.catopt{
-  padding:9px 10px;font-family:'IBM Plex Sans';font-size:14px;cursor:pointer;
-  border-bottom:1px solid var(--bg);
+/* ---------- Modal ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(42,33,24,.45);display:none;align-items:flex-start;justify-content:center;
+  z-index:50;padding:40px 16px;overflow-y:auto;
 }
-.catopt:last-child{border-bottom:none;}
-.catopt:active,.catopt:hover{background:var(--bg);}
+.modal-backdrop.open{display:flex;}
+.modal{
+  background:var(--surface);border-radius:8px;padding:22px;max-width:480px;width:100%;
+  box-shadow:0 12px 40px rgba(0,0,0,.25);
+}
+.modal h3{margin:0 0 16px;font-size:18px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
 
-.qrwrap{text-align:center;padding:10px 0;}
-#qrcanvas-holder{display:inline-block;padding:10px;background:#fff;border:2px solid var(--ink);border-radius:4px;}
-.qrmeta{font-family:'IBM Plex Mono';font-size:12px;margin-top:10px;color:var(--steel);}
+/* ---------- Empty state ---------- */
+.empty{padding:40px 20px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
 
-#scanvideo{width:100%;border-radius:6px;background:#000;}
-.scanhint{font-family:'IBM Plex Mono';font-size:12px;color:var(--steel);text-align:center;margin-top:8px;}
-.scanresult{
-  background:var(--bg);border:1.5px solid var(--ink);border-radius:6px;padding:12px;margin-top:10px;
+/* ---------- Delivery slip ---------- */
+.slip-wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+.slip-picker{flex:0 0 260px;}
+.slip{
+  flex:1;min-width:280px;background:#fff;border:1px solid var(--line);border-radius:6px;
+  padding:28px;box-shadow:0 2px 10px rgba(0,0,0,.06);
+}
+.slip h2{margin:0 0 2px;font-size:22px;}
+.slip .slip-sub{color:var(--ink-soft);font-size:12px;margin-bottom:18px;}
+.slip-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px;}
+.slip-row .k{color:var(--ink-soft);}
+.slip-row .v{font-weight:600;font-family:'IBM Plex Mono',monospace;}
+.slip-total{margin-top:12px;padding-top:12px;border-top:2px solid var(--ink);display:flex;justify-content:space-between;font-size:17px;font-weight:700;}
+.slip-thanks{margin-top:20px;text-align:center;font-family:'Fraunces',serif;font-style:italic;color:var(--ink-soft);font-size:13.5px;}
+
+@media print{
+  body *{visibility:hidden;}
+  .slip,.slip *{visibility:visible;}
+  .slip{position:absolute;top:0;left:0;width:100%;box-shadow:none;border:none;}
 }
 
-.toast{
+.status-toast{
   position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
-  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:5px;
-  font-family:'IBM Plex Mono';font-size:12px;z-index:100;
+  background:var(--ink);color:var(--surface);padding:9px 18px;border-radius:20px;
+  font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:100;
+}
+.status-toast.show{opacity:1;}
+
+.link-btn{background:none;border:none;color:var(--pine-deep);font-weight:600;font-size:12.5px;text-decoration:underline;padding:0;}
+
+@media (max-width:640px){
+  .field-row{grid-template-columns:1fr;}
+  .hero{flex-direction:column;align-items:flex-start;}
 }
 </style>
 </head>
 <body>
+<div id="app">
+  <div class="hero">
+    <div>
+      <h1 class="hero-title">ΠΕΛΛΕΤ <span class="accent">&middot;</span> Διαχείριση</h1>
+      <div class="hero-sub">Απόθεμα, πελάτες, παραγγελίες &amp; δελτία αποστολής</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="hero-date mono" id="todayDate"></div>
+      <button class="btn secondary small" style="margin-top:8px;" onclick="exportToExcel()">⬇ Backup σε Excel</button>
+    </div>
+  </div>
 
-<div id="app"></div>
+  <div class="tabs">
+    <button class="tab active" data-view="dashboard">Σύνοψη</button>
+    <button class="tab" data-view="warehouse">Αποθήκη</button>
+    <button class="tab" data-view="customers">Πελάτες</button>
+    <button class="tab" data-view="orders">Παραγγελίες</button>
+    <button class="tab" data-view="completed">Ολοκληρωμένες</button>
+    <button class="tab" data-view="slip">Δελτίο Αποστολής</button>
+  </div>
+
+  <div id="loadingMsg" class="empty">Φόρτωση δεδομένων…</div>
+
+  <div class="view" id="view-dashboard"></div>
+  <div class="view" id="view-warehouse"></div>
+  <div class="view" id="view-customers"></div>
+  <div class="view" id="view-orders"></div>
+  <div class="view" id="view-completed"></div>
+  <div class="view" id="view-slip"></div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<div class="status-toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbylLR_wSZkwPGRWiMi9N2ytrYC3LoCX4LpNPV1uy4OYD1ArgR46imRJNIHpXiF3TM0RoA/exec';
-const hasCloudStorage = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+/* ============================= STATE ============================= */
+const STORAGE_KEY = 'pellet-app-data';
+let DATA = null; // {products, customers, orders, meta}
+let currentView = 'dashboard';
 
-// Generic JSONP call — avoids CORS entirely, works from file:// pages too
-function jsonpCall(params, timeoutMs){
-  return new Promise((resolve, reject)=>{
-    const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+const PAYMENT_METHODS = ['Μετρητά','Κάρτα','Τραπεζική Κατάθεση','Επί Πιστώσει'];
+const DELIVERY_STATUSES = ['Εκκρεμεί','Μερική Παράδοση','Παραδόθηκε','Ακυρώθηκε'];
+const UNITS = ['Παλέτα','Σακί'];
+
+function uid(prefix){ return prefix + Math.random().toString(36).slice(2,8); }
+
+function seedData(){
+  const products = [
+    {id:'p1', name:'HOT MATERIAL', initialStock:11, bagsPerPallet:66, palletPrice:450, bagPrice:6.5},
+    {id:'p2', name:'ORSO BIANCO', initialStock:18, bagsPerPallet:70, palletPrice:430, bagPrice:null},
+    {id:'p3', name:'HOLZ ENERGIE', initialStock:18, bagsPerPallet:null, palletPrice:380, bagPrice:null},
+    {id:'p4', name:'PINIERA', initialStock:23, bagsPerPallet:78, palletPrice:430, bagPrice:null},
+    {id:'p5', name:'ZUMBULLER', initialStock:8, bagsPerPallet:72, palletPrice:380, bagPrice:null},
+  ];
+  const customers = [
+    {id:'C001', name:'Αλεξης', phone:'6973550048', address:'', mapsLink:''},
+    {id:'C002', name:'Ανδρεας Χαλκιας', phone:'6988166330', address:'Λιβαδη', mapsLink:''},
+    {id:'C003', name:'Αλεξιου', phone:'', address:'Μελικη', mapsLink:''},
+    {id:'C004', name:'Γρηγορης Μαμουτοπουλος', phone:'6948917609', address:'Βεροια', mapsLink:''},
+    {id:'C005', name:'Νολας', phone:'6971618704', address:'Βεροια', mapsLink:'https://maps.app.goo.gl/Jr7QAF9LuHGKPwr7A'},
+    {id:'C006', name:'Χρηστος Κωστηκιδης', phone:'2331092456', address:'Βεργινα', mapsLink:'https://maps.app.goo.gl/ZvMcSAMRUNnZ2cLs7'},
+    {id:'C007', name:'Σιδερηδης', phone:'6972602850', address:'Αγκαθια', mapsLink:'https://maps.app.goo.gl/VjoR88opYhjCVCmu5'},
+    {id:'C008', name:'Γαλανης', phone:'6906551149', address:'Αλεξανδρεια Κομνηνων 3', mapsLink:'https://maps.app.goo.gl/zJ4CBh2dQFKeQDda8'},
+    {id:'C009', name:'Κοσμας', phone:'', address:'Βεροια', mapsLink:''},
+    {id:'C010', name:'Κοκοφτοπουλος Γιωργος', phone:'6972854126', address:'Π.Προδρομος', mapsLink:'https://maps.app.goo.gl/SKkXRzEYfpF21YQX7'},
+    {id:'C011', name:'Δαραβιγκας Γιωργος', phone:'6983582884', address:'Π.Προδρομος', mapsLink:''},
+    {id:'C012', name:'Μουχταροπουλος Θωμας', phone:'6972321923', address:'Κολινδρος', mapsLink:''},
+    {id:'C013', name:'Δροσυνος', phone:'6977809475', address:'Κολινδρος', mapsLink:'https://maps.app.goo.gl/Mcu2v4LT5SMcb9mV9'},
+    {id:'C014', name:'Χρυσα', phone:'6932243569', address:'βεροια', mapsLink:'https://maps.app.goo.gl/hsYnT3PGukDui8fH9'},
+    {id:'C015', name:'Δημητρος Γιαννοπουλος', phone:'6976064626', address:'Νεοκαστρο', mapsLink:'https://maps.app.goo.gl/gWepjtr6bb8h1oT9A'},
+    {id:'C016', name:'Δελημανης', phone:'6980006878', address:'Αγκαθια', mapsLink:'https://maps.app.goo.gl/aYh5gAt47DUavhSG7'},
+  ];
+  const byName = n => customers.find(c=>c.name===n)?.id || null;
+  const byProd = n => products.find(p=>p.name===n)?.id;
+  const orders = [
+    {id:'o1', date:null, customerId:byName('Αλεξιου'), productId:byProd('ORSO BIANCO'), quantity:5, unit:'Παλέτα', unitPrice:410, paymentMethod:'Μετρητά', paidAmount:1000, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o2', date:null, customerId:byName('Γαλανης'), productId:byProd('ZUMBULLER'), quantity:3, unit:'Παλέτα', unitPrice:380, paymentMethod:'Μετρητά', paidAmount:1140, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o3', date:null, customerId:byName('Νολας'), productId:byProd('HOT MATERIAL'), quantity:2, unit:'Παλέτα', unitPrice:430, paymentMethod:'Μετρητά', paidAmount:860, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o4', date:null, customerId:byName('Χρηστος Κωστηκιδης'), productId:byProd('HOT MATERIAL'), quantity:4, unit:'Παλέτα', unitPrice:430, paymentMethod:'Μετρητά', paidAmount:1720, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o5', date:null, customerId:byName('Αλεξης'), productId:byProd('HOT MATERIAL'), quantity:7, unit:'Παλέτα', unitPrice:440, paymentMethod:'Μετρητά', paidAmount:3080, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o6', date:null, customerId:byName('Γρηγορης Μαμουτοπουλος'), productId:byProd('ZUMBULLER'), quantity:2, unit:'Παλέτα', unitPrice:370, paymentMethod:'Μετρητά', paidAmount:740, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o7', date:null, customerId:byName('Κοσμας'), productId:byProd('HOT MATERIAL'), quantity:1, unit:'Παλέτα', unitPrice:440, paymentMethod:'Μετρητά', paidAmount:0, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o8', date:null, customerId:byName('Μουχταροπουλος Θωμας'), productId:byProd('HOLZ ENERGIE'), quantity:5, unit:'Παλέτα', unitPrice:380, paymentMethod:'Μετρητά', paidAmount:1900, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:'2026-09-01', notes:''},
+    {id:'o9', date:null, customerId:byName('Δαραβιγκας Γιωργος'), productId:byProd('ORSO BIANCO'), quantity:3, unit:'Παλέτα', unitPrice:430, paymentMethod:'Μετρητά', paidAmount:1290, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o10', date:null, customerId:byName('Χρυσα'), productId:byProd('HOT MATERIAL'), quantity:2, unit:'Παλέτα', unitPrice:460, paymentMethod:'Επί Πιστώσει', paidAmount:0, deliveryStatus:'Εκκρεμεί', deliveredQty:0, deliveryDate:null, notes:''},
+    {id:'o11', date:null, customerId:byName('Σιδερηδης'), productId:byProd('HOT MATERIAL'), quantity:5, unit:'Παλέτα', unitPrice:450, paymentMethod:'Μετρητά', paidAmount:2250, deliveryStatus:'Παραδόθηκε', deliveredQty:5, deliveryDate:null, notes:''},
+    {id:'o12', date:null, customerId:byName('Ανδρεας Χαλκιας'), productId:byProd('ZUMBULLER'), quantity:3, unit:'Παλέτα', unitPrice:350, paymentMethod:'Μετρητά', paidAmount:1050, deliveryStatus:'Παραδόθηκε', deliveredQty:3, deliveryDate:'2026-07-15', notes:''},
+    {id:'o13', date:null, customerId:byName('Ανδρεας Χαλκιας'), productId:byProd('HOLZ ENERGIE'), quantity:2, unit:'Παλέτα', unitPrice:350, paymentMethod:'Μετρητά', paidAmount:700, deliveryStatus:'Παραδόθηκε', deliveredQty:2, deliveryDate:'2026-07-16', notes:''},
+    {id:'o14', date:null, customerId:byName('Δροσυνος'), productId:byProd('ZUMBULLER'), quantity:3, unit:'Παλέτα', unitPrice:350, paymentMethod:'Μετρητά', paidAmount:1050, deliveryStatus:'Παραδόθηκε', deliveredQty:3, deliveryDate:'2026-07-17', notes:''},
+    {id:'o15', date:null, customerId:byName('Δημητρος Γιαννοπουλος'), productId:byProd('PINIERA'), quantity:3, unit:'Παλέτα', unitPrice:430, paymentMethod:'Μετρητά', paidAmount:0, deliveryStatus:'Παραδόθηκε', deliveredQty:3, deliveryDate:null, notes:''},
+  ];
+  return {products, customers, orders, meta:{nextOrderNum:16}};
+}
+
+/* ============================= STORAGE (Google Apps Script / Google Sheet) ============================= */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx40hSHzftQIM-LeKsuhcQepDLC82bg8qgHPb7eQzskK8ScNE1zqLLy2fiIAEK80Pk3/exec';
+
+function jsonpLoad(){
+  return new Promise((resolve)=>{
+    const cbName = 'pelletCb_' + Date.now();
     let done = false;
     const script = document.createElement('script');
-    const timer = setTimeout(()=>{
-      if(done) return; done = true;
-      cleanup(); reject(new Error('timeout'));
-    }, timeoutMs || 8000);
-    function cleanup(){
-      clearTimeout(timer);
+    window[cbName] = function(res){
+      if(done) return;
+      done = true;
       delete window[cbName];
-      if(script.parentNode) script.parentNode.removeChild(script);
-    }
-    window[cbName] = function(data){
-      if(done) return; done = true;
-      cleanup(); resolve(data);
+      script.remove();
+      resolve(res);
     };
-    script.onerror = ()=>{
-      if(done) return; done = true;
-      cleanup(); reject(new Error('jsonp load error'));
-    };
-    const qs = Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k])).join('&');
-    script.src = APPS_SCRIPT_URL + '?' + qs + '&callback=' + cbName;
+    script.src = APPS_SCRIPT_URL + '?action=load&callback=' + cbName;
+    script.onerror = ()=>{ if(done) return; done = true; delete window[cbName]; script.remove(); resolve({success:false}); };
     document.body.appendChild(script);
+    setTimeout(()=>{
+      if(done) return; done = true;
+      delete window[cbName]; script.remove(); resolve({success:false});
+    }, 10000);
   });
 }
 
-function jsonpList(timeoutMs){ return jsonpCall({ action: 'list' }, timeoutMs); }
-
-// Hidden-iframe form POST — avoids CORS entirely (plain form navigation, not fetch/XHR)
-function iframePostFields(fields){
+function iframePost(dataStr){
   return new Promise((resolve)=>{
-    const frameName = 'post_frame_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+    const iframeName = 'pelletPostFrame_' + Date.now();
     const iframe = document.createElement('iframe');
-    iframe.name = frameName;
+    iframe.name = iframeName;
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = APPS_SCRIPT_URL;
-    form.target = frameName;
+    form.target = iframeName;
     form.style.display = 'none';
 
-    Object.keys(fields).forEach(k=>{
-      const input = document.createElement('input');
-      input.name = k;
-      input.value = fields[k] == null ? '' : String(fields[k]);
-      form.appendChild(input);
-    });
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'data';
+    input.value = dataStr;
+    form.appendChild(input);
 
     document.body.appendChild(form);
     form.submit();
 
-    // Cross-origin iframe content can't be read, so just give it time to land
     setTimeout(()=>{
-      if(form.parentNode) form.parentNode.removeChild(form);
-      if(iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      resolve();
+      form.remove();
+      iframe.remove();
+      resolve(true);
     }, 1500);
   });
 }
 
-function normalizeProduct(p){
-  return {
-    id: String(p.id),
-    code: p.code != null ? String(p.code) : '',
-    name: p.name != null ? String(p.name) : '',
-    category: p.category != null ? String(p.category) : '',
-    qty: Number(p.qty) || 0,
-    price: Number(p.price) || 0,
-    lowStockAt: Number(p.lowStockAt) || 5
-  };
-}
-
-// Fallback storage (only used when APPS_SCRIPT_URL isn't set) — whole-array blob
-async function storageGet(key){
-  if(hasCloudStorage){
-    return await window.storage.get(key, true);
-  }
-  try{
-    const v = localStorage.getItem(key);
-    return v ? { key, value: v, shared:false } : null;
-  }catch(e){
-    return null;
-  }
-}
-
-async function storageSet(key, value){
-  if(hasCloudStorage){
-    return await window.storage.set(key, value, true);
-  }
-  try{
-    localStorage.setItem(key, value);
-    return { key, value, shared:false };
-  }catch(e){
-    return null;
-  }
-}
-
-async function saveProductsArrayFallback(){
-  try{
-    const result = await withTimeout(storageSet('products', JSON.stringify(products)), 8000);
-    if(!result){
-      showToast('⚠ Δεν αποθηκεύτηκε — δοκίμασε ξανά.');
-      return false;
-    }
-    return true;
-  }catch(e){
-    showToast('⚠ Δεν αποθηκεύτηκε (πρόβλημα σύνδεσης) — δοκίμασε ξανά.');
-    return false;
-  }
-}
-
-// Save/delete a single product as its own row (Apps Script path) — no cell-size limit
-async function persistUpsert(data, isEdit, oldId){
-  if(APPS_SCRIPT_URL){
+async function loadData(){
+  const res = await jsonpLoad();
+  if(res && res.success && res.data && res.data !== '{}'){
     try{
-      await iframePostFields({
-        action: 'upsert',
-        id: data.id, code: data.code, name: data.name, category: data.category,
-        qty: data.qty, price: data.price, lowStockAt: data.lowStockAt
-      });
-      const verify = await withTimeout(jsonpList(), 8000);
-      const found = verify && Array.isArray(verify.products) && verify.products.find(x=>String(x.id)===String(data.id));
-      if(found){
-        products = isEdit ? products.map(x=>x.id===oldId?data:x) : [...products, data];
-        return true;
-      }
-      return false;
+      const parsed = JSON.parse(res.data);
+      DATA = (parsed && parsed.products) ? parsed : seedData();
     }catch(e){
-      return false;
+      DATA = seedData();
     }
+  } else {
+    DATA = seedData();
   }
-  const backup = products;
-  products = isEdit ? products.map(x=>x.id===oldId?data:x) : [...products, data];
-  const ok = await saveProductsArrayFallback();
-  if(!ok){ products = backup; }
-  return ok;
-}
-
-async function persistDelete(id){
-  if(APPS_SCRIPT_URL){
-    try{
-      await iframePostFields({ action: 'delete', id: id });
-      const verify = await withTimeout(jsonpList(), 8000);
-      const stillThere = verify && Array.isArray(verify.products) && verify.products.some(x=>String(x.id)===String(id));
-      if(!stillThere){
-        products = products.filter(x=>x.id!==id);
-        return true;
-      }
-      return false;
-    }catch(e){
-      return false;
-    }
+  document.getElementById('loadingMsg').style.display = 'none';
+  renderAll();
+  if(!res || !res.success || !res.data || res.data === '{}'){
+    await saveData(); // persist the seed on first run so the sheet isn't empty
   }
-  const backup = products;
-  products = products.filter(x=>x.id!==id);
-  const ok = await saveProductsArrayFallback();
-  if(!ok){ products = backup; }
-  return ok;
 }
-
-let products = [];
-let filterCat = 'Όλα';
-let searchTerm = '';
-
-function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-
-let loadFailed = false;
-
-function withTimeout(promise, ms){
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(()=>reject(new Error('timeout')), ms))
-  ]);
-}
-
-async function loadProducts(){
-  loadFailed = false;
-  try{
-    if(APPS_SCRIPT_URL){
-      const data = await withTimeout(jsonpList(), 8000);
-      products = (data && Array.isArray(data.products)) ? data.products.map(normalizeProduct) : [];
-    } else {
-      const res = await withTimeout(storageGet('products'), 8000);
-      products = res && res.value ? JSON.parse(res.value) : [];
-    }
-  }catch(e){
-    // key not existing yet is normal (empty warehouse); anything else, flag it
-    products = [];
-    if(!String(e && e.message).toLowerCase().includes('not found')){
-      loadFailed = true;
-    }
-  }
-  render();
+async function saveData(){
+  await iframePost(JSON.stringify(DATA));
 }
 
 function showToast(msg){
-  const t = document.createElement('div');
-  t.className='toast'; t.textContent=msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 2200);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
-function categories(){
-  const set = new Set(products.map(p=>p.category).filter(Boolean));
-  return ['Όλα', ...Array.from(set).sort()];
+/* ============================= HELPERS ============================= */
+function eur(n){
+  if(n===null||n===undefined||isNaN(n)) return '—';
+  return n.toLocaleString('el-GR',{minimumFractionDigits:0,maximumFractionDigits:2}) + ' €';
+}
+function num(n,d=0){ if(n===null||n===undefined||isNaN(n)) return '—'; return Number(n).toLocaleString('el-GR',{maximumFractionDigits:d}); }
+function customerName(id){ return DATA.customers.find(c=>c.id===id)?.name || '—'; }
+function productName(id){ return DATA.products.find(p=>p.id===id)?.name || '—'; }
+function productById(id){ return DATA.products.find(p=>p.id===id); }
+
+function toPallets(order){
+  const p = productById(order.productId);
+  if(!p) return 0;
+  if(order.unit === 'Παλέτα') return Number(order.quantity)||0;
+  const bpp = Number(p.bagsPerPallet)||0;
+  if(!bpp) return 0;
+  return (Number(order.quantity)||0) / bpp;
+}
+function orderTotal(order){
+  return (Number(order.quantity)||0) * (Number(order.unitPrice)||0);
+}
+function orderBalance(order){
+  return orderTotal(order) - (Number(order.paidAmount)||0);
+}
+function badgeClass(status){
+  switch(status){
+    case 'Εκκρεμεί': return 'pending';
+    case 'Μερική Παράδοση': return 'partial';
+    case 'Παραδόθηκε': return 'delivered';
+    case 'Ακυρώθηκε': return 'cancelled';
+    default: return 'none';
+  }
 }
 
-function stockLevel(p){
-  const low = p.lowStockAt ?? 5;
-  if(p.qty <= 0) return 'danger';
-  if(p.qty <= low) return 'signal';
-  return 'ok';
-}
-
-function esc(s){
-  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function render(){
-  const app = document.getElementById('app');
-  const cats = categories();
-  const list = products.filter(p=>{
-    const matchCat = filterCat==='Όλα' || p.category===filterCat;
-    const term = searchTerm.trim().toLowerCase();
-    const matchSearch = !term || (p.name||'').toLowerCase().includes(term) || (p.code||'').toLowerCase().includes(term);
-    return matchCat && matchSearch;
+function productStats(productId){
+  const p = productById(productId);
+  const orders = DATA.orders.filter(o=>o.productId===productId);
+  let ordered = 0, delivered = 0, unpaid = 0;
+  orders.forEach(o=>{
+    ordered += toPallets(o);
+    if(o.deliveryStatus === 'Παραδόθηκε' || o.deliveryStatus === 'Μερική Παράδοση'){
+      const p2 = productById(o.productId);
+      if(o.unit === 'Παλέτα'){ delivered += Number(o.deliveredQty)||0; }
+      else if(p2 && p2.bagsPerPallet){ delivered += (Number(o.deliveredQty)||0)/p2.bagsPerPallet; }
+    }
+    if(o.deliveryStatus !== 'Ακυρώθηκε' && o.deliveryStatus !== 'Παραδόθηκε'){
+      unpaid += orderBalance(o);
+    }
   });
+  const available = (Number(p.initialStock)||0) - ordered;
+  const toDeliver = ordered - delivered;
+  const value = available * (Number(p.palletPrice)||0);
+  return {ordered, delivered, toDeliver, available, unpaid, value};
+}
 
-  app.innerHTML = `
-    <div class="banner">
-      <h1>Η Αποθήκη μας</h1>
-      <p>Υλικά οικοδομών • Εργαλεία • ${products.length} καταχωρημένα προϊόντα ${APPS_SCRIPT_URL ? '• Συγχρονισμένα σε όλες τις συσκευές' : (hasCloudStorage ? '• Κοινόχρηστα δεδομένα' : '• Τοπική αποθήκευση σε αυτή τη συσκευή')}</p>
+/* ============================= NAV ============================= */
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+currentView).classList.add('active');
+    renderView(currentView);
+  });
+});
+
+function renderAll(){
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('el-GR',{weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  renderView('dashboard');
+  document.getElementById('view-dashboard').classList.add('active');
+}
+
+function renderView(view){
+  if(view==='dashboard') renderDashboard();
+  if(view==='warehouse') renderWarehouse();
+  if(view==='customers') renderCustomers();
+  if(view==='orders') renderOrders();
+  if(view==='completed') renderCompleted();
+  if(view==='slip') renderSlip();
+}
+
+/* ============================= DASHBOARD ============================= */
+function renderDashboard(){
+  const el = document.getElementById('view-dashboard');
+  let totalValue=0, totalToDeliver=0, totalUnpaid=0, totalAvailable=0;
+  const cards = DATA.products.map(p=>{
+    const s = productStats(p.id);
+    totalValue += s.value; totalToDeliver += s.toDeliver; totalUnpaid += s.unpaid; totalAvailable += s.available;
+    const pct = p.initialStock ? Math.max(0, Math.min(100, (s.available/p.initialStock)*100)) : 0;
+    const low = s.available < 0;
+    return `
+      <div class="stock-card">
+        <div class="pellet-dots">● ● ●</div>
+        <div class="pname">${p.name}</div>
+        <div class="gauge"><div class="gauge-fill ${low?'low':''}" style="width:${low?100:pct}%"></div></div>
+        <div class="stock-row"><span>Διαθέσιμο</span><b class="${low?'stock-neg':''}">${num(s.available,1)} παλ.</b></div>
+        <div class="stock-row"><span>Προς παράδοση</span><b>${num(s.toDeliver,1)} παλ.</b></div>
+        <div class="stock-row"><span>Αξία αποθέματος</span><b>${eur(s.value)}</b></div>
+        <div class="stock-row"><span>Ανεξόφλητα</span><b>${eur(s.unpaid)}</b></div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="summary-strip">
+      <div class="summary-item"><div class="label">Σύνολο διαθέσιμο</div><div class="value ${totalAvailable<0?'rust':'pine'}">${num(totalAvailable,1)} παλ.</div></div>
+      <div class="summary-item"><div class="label">Αξία αποθέματος</div><div class="value">${eur(totalValue)}</div></div>
+      <div class="summary-item"><div class="label">Προς παράδοση</div><div class="value">${num(totalToDeliver,1)} παλ.</div></div>
+      <div class="summary-item"><div class="label">Ανεξόφλητα ποσά</div><div class="value rust">${eur(totalUnpaid)}</div></div>
     </div>
-    ${loadFailed ? `
-      <div style="background:var(--danger);color:#fff;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-family:'IBM Plex Sans';font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
-        <span>⚠ Πρόβλημα φόρτωσης — αυτά που βλέπεις μπορεί να μην είναι τα τελευταία δεδομένα.</span>
-        <button id="btnRetryLoad" style="flex:none;background:#fff;color:var(--danger);border:none;border-radius:4px;padding:6px 10px;font-weight:600;cursor:pointer;">Ξαναδοκίμασε</button>
-      </div>
-    ` : ''}
+    <p class="section-title">Απόθεμα ανά είδος</p>
+    <div class="stock-grid">${cards}</div>
+  `;
+}
 
+/* ============================= WAREHOUSE ============================= */
+function renderWarehouse(){
+  const el = document.getElementById('view-warehouse');
+  const rows = DATA.products.map(p=>{
+    const s = productStats(p.id);
+    return `<tr>
+      <td><b>${p.name}</b></td>
+      <td class="num ${p.initialStock<0?'stock-neg':''}">${num(p.initialStock)}</td>
+      <td class="num">${p.bagsPerPallet? num(p.bagsPerPallet) : '—'}</td>
+      <td class="num ${p.palletPrice<0?'stock-neg':''}">${p.palletPrice? eur(p.palletPrice): '—'}</td>
+      <td class="num">${p.bagPrice? eur(p.bagPrice): '—'}</td>
+      <td class="num ${s.available<0?'stock-neg':''}">${num(s.available,1)}</td>
+      <td class="num ${s.toDeliver<0?'stock-neg':''}">${num(s.toDeliver,1)}</td>
+      <td class="num">${eur(s.value)}</td>
+      <td>
+        <button class="icon-btn" onclick="openProductModal('${p.id}')">✎</button>
+        <button class="icon-btn" onclick="deleteProduct('${p.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
     <div class="toolbar">
-      <div class="searchrow">
-        <input id="searchInput" type="text" placeholder="Αναζήτηση όνομα ή κωδικός..." value="${esc(searchTerm)}"/>
-      </div>
-      <div class="chips">
-        ${cats.map(c=>`<div class="chip ${c===filterCat?'active':''}" data-cat="${esc(c)}">${esc(c)}</div>`).join('')}
-      </div>
+      <p class="section-title" style="margin:0;">Είδη πελλετ</p>
+      <button class="btn" onclick="openProductModal()">+ Νέο είδος</button>
     </div>
-
-    <div class="actionrow">
-      <button class="iconbtn signal" id="btnAdd">+ Νέο προϊόν</button>
-      <button class="iconbtn ghost" id="btnScan" style="border-color:var(--ink)">⌗ Σάρωση QR</button>
-    </div>
-
-    ${list.length===0 ? `
-      <div class="empty">
-        <b>${products.length===0 ? 'Δεν υπάρχουν προϊόντα ακόμα' : 'Δεν βρέθηκαν αποτελέσματα'}</b>
-        ${products.length===0 ? 'Πάτησε "+ Νέο προϊόν" για να προσθέσεις το πρώτο σου είδος.' : 'Δοκίμασε άλλο όρο αναζήτησης ή κατηγορία.'}
-      </div>
-    ` : `
-      <div class="grid">
-        ${list.map(p=>`
-          <div class="card">
-            <div class="bar" style="background:var(--${stockLevel(p)})"></div>
-            <div class="body">
-              <div class="code">${esc(p.code)}</div>
-              <div class="name">${esc(p.name)}</div>
-              <div class="row">
-                <div class="qty">${p.qty}<span>Τεμάχια</span></div>
-                <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
-              </div>
-              <div class="cardbtns">
-                <button data-sell="${p.id}" style="background:var(--ok);color:#fff;border-color:var(--ok);">Πούλησα</button>
-                <button data-qr="${p.id}">QR</button>
-                <button data-edit="${p.id}">Επεξεργασία</button>
-              </div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `}
-  `;
-
-  document.getElementById('searchInput').addEventListener('input', e=>{
-    searchTerm = e.target.value; render();
-    // keep focus after re-render
-    const el = document.getElementById('searchInput');
-    el.focus(); el.selectionStart = el.selectionEnd = el.value.length;
-  });
-  document.querySelectorAll('.chip').forEach(el=>{
-    el.addEventListener('click', ()=>{ filterCat = el.dataset.cat; render(); });
-  });
-  if(loadFailed){
-    document.getElementById('btnRetryLoad').addEventListener('click', loadProducts);
-  }
-  document.getElementById('btnAdd').addEventListener('click', ()=>openEditModal(null));
-  document.getElementById('btnScan').addEventListener('click', openScanModal);
-  document.querySelectorAll('[data-qr]').forEach(el=>{
-    el.addEventListener('click', ()=>openQrModal(el.dataset.qr));
-  });
-  document.querySelectorAll('[data-edit]').forEach(el=>{
-    el.addEventListener('click', ()=>openEditModal(el.dataset.edit));
-  });
-  document.querySelectorAll('[data-sell]').forEach(el=>{
-    el.addEventListener('click', ()=>openSellModal(el.dataset.sell));
-  });
-}
-
-function openSellModal(id){
-  const p = products.find(x=>x.id===id);
-  if(!p) return;
-  const wrap = document.createElement('div');
-  wrap.className='overlay';
-  wrap.innerHTML = `
-    <div class="modal">
-      <h2>Πούλησα</h2>
-      <div class="qrmeta" style="margin-bottom:10px;text-align:left">${esc(p.code)} — ${esc(p.name)}<br>Τρέχον απόθεμα: <b>${p.qty}</b></div>
-      <div class="field"><label>Ποσότητα που πούλησες</label>
-        <input id="sellAmount" type="number" value="1" min="1"/>
-      </div>
-      <div class="modalbtns">
-        <button class="iconbtn ghost" id="btnCancelSell">Άκυρο</button>
-        <button class="iconbtn signal" id="btnConfirmSell">Αφαίρεση από απόθεμα</button>
-      </div>
-    </div>`;
-  document.body.appendChild(wrap);
-  document.getElementById('btnCancelSell').addEventListener('click', closeModal);
-  wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
-  const amountInput = document.getElementById('sellAmount');
-  amountInput.focus(); amountInput.select();
-  document.getElementById('btnConfirmSell').addEventListener('click', async ()=>{
-    const amt = parseFloat(amountInput.value) || 0;
-    if(amt<=0){ showToast('Βάλε μια ποσότητα μεγαλύτερη από 0.'); return; }
-    const btn = document.getElementById('btnConfirmSell');
-    btn.disabled = true; btn.textContent = 'Ενημέρωση...';
-    const newQty = Math.max(0, p.qty - amt);
-    const data = { ...p, qty: newQty };
-    const ok = await persistUpsert(data, true, p.id);
-    if(ok){
-      closeModal(); render();
-      showToast('Ενημερώθηκε το απόθεμα.');
-    } else {
-      btn.disabled = false; btn.textContent = 'Αφαίρεση από απόθεμα';
-      showToast('⚠ Δεν ενημερώθηκε — δοκίμασε ξανά.');
-    }
-  });
-}
-
-function closeModal(){
-  const ov = document.querySelector('.overlay');
-  if(ov){
-    if(codeReader){ try{ codeReader.reset(); }catch(e){} codeReader=null; }
-    ov.remove();
-  }
-}
-
-function openEditModal(id, prefillCode){
-  const p = id ? products.find(x=>x.id===id) : null;
-  const wrap = document.createElement('div');
-  wrap.className='overlay';
-  wrap.innerHTML = `
-    <div class="modal">
-      <h2>${p ? 'Επεξεργασία προϊόντος' : 'Νέο προϊόν'}</h2>
-      <div class="field"><label>Κωδικός</label><input id="f_code" value="${p?esc(p.code):esc(prefillCode||'')}" placeholder="π.χ. TSM-25KG"/></div>
-      <div class="field"><label>Όνομα</label><input id="f_name" value="${p?esc(p.name):''}" placeholder="π.χ. Τσιμέντο 25kg"/></div>
-      <div class="field" style="position:relative">
-        <label>Κατηγορία</label>
-        <input id="f_cat" autocomplete="off" value="${p?esc(p.category):''}" placeholder="π.χ. Υλικά / Εργαλεία"/>
-        <div id="catSuggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--line);border-top:none;border-radius:0 0 5px 5px;max-height:160px;overflow-y:auto;z-index:5;"></div>
-      </div>
-      <div class="field"><label>Ποσότητα</label><input id="f_qty" type="number" value="${p?p.qty:0}"/></div>
-      <div class="field"><label>Τιμή (€)</label><input id="f_price" type="number" step="0.01" value="${p?p.price:0}"/></div>
-      <div class="field"><label>Ειδοποίηση όταν πέσει κάτω από</label><input id="f_low" type="number" value="${p?(p.lowStockAt??5):5}"/></div>
-      <div class="modalbtns">
-        ${p?'<button class="iconbtn danger" id="btnDelete">Διαγραφή</button>':''}
-        <button class="iconbtn ghost" id="btnCancel">Άκυρο</button>
-        <button class="iconbtn signal" id="btnSave">Αποθήκευση</button>
-      </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Είδος</th><th class="num">Αρχικό (παλ.)</th><th class="num">Σακιά/παλέτα</th>
+          <th class="num">Τιμή παλέτας</th><th class="num">Τιμή σακιού</th>
+          <th class="num">Διαθέσιμο</th><th class="num">Προς παράδοση</th><th class="num">Αξία</th><th></th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="9" class="empty">Δεν υπάρχουν είδη ακόμα.</td></tr>`}</tbody>
+      </table>
     </div>
   `;
-  document.body.appendChild(wrap);
-  document.getElementById('btnCancel').addEventListener('click', closeModal);
-  wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
-
-  const catInput = document.getElementById('f_cat');
-  const catSuggest = document.getElementById('catSuggest');
-  const allCats = categories().filter(c=>c!=='Όλα');
-  function showCatSuggestions(){
-    const term = catInput.value.trim().toLowerCase();
-    const matches = allCats.filter(c=>!term || c.toLowerCase().includes(term));
-    if(matches.length===0){ catSuggest.style.display='none'; return; }
-    catSuggest.innerHTML = matches.map(c=>`<div class="catopt">${esc(c)}</div>`).join('');
-    catSuggest.style.display='block';
-    catSuggest.querySelectorAll('.catopt').forEach((el,i)=>{
-      el.addEventListener('mousedown', e=>e.preventDefault()); // keep focus, avoid blur firing first
-      el.addEventListener('click', ()=>{
-        catInput.value = matches[i];
-        catSuggest.style.display='none';
-      });
-    });
-  }
-  catInput.addEventListener('focus', showCatSuggestions);
-  catInput.addEventListener('input', showCatSuggestions);
-  catInput.addEventListener('blur', ()=>{ setTimeout(()=>{ catSuggest.style.display='none'; }, 150); });
-
-  if(p){
-    document.getElementById('btnDelete').addEventListener('click', async ()=>{
-      const btn = document.getElementById('btnDelete');
-      btn.disabled = true; btn.textContent = 'Διαγραφή...';
-      const ok = await persistDelete(id);
-      if(ok){
-        closeModal(); render();
-        showToast('Το προϊόν διαγράφηκε.');
-      } else {
-        btn.disabled = false; btn.textContent = 'Διαγραφή';
-        showToast('⚠ Δεν διαγράφηκε — δοκίμασε ξανά.');
-      }
-    });
-  }
-  document.getElementById('btnSave').addEventListener('click', async ()=>{
-    const name = document.getElementById('f_name').value.trim();
-    if(!name){ showToast('Βάλε ένα όνομα προϊόντος.'); return; }
-    const data = {
-      id: p ? p.id : uid(),
-      code: document.getElementById('f_code').value.trim() || 'ΧΩΡΙΣ-ΚΩΔΙΚΟ',
-      name,
-      category: document.getElementById('f_cat').value.trim() || 'Χωρίς κατηγορία',
-      qty: parseFloat(document.getElementById('f_qty').value) || 0,
-      price: parseFloat(document.getElementById('f_price').value) || 0,
-      lowStockAt: parseFloat(document.getElementById('f_low').value) || 5,
-    };
-    const btn = document.getElementById('btnSave');
-    btn.disabled = true; btn.textContent = 'Αποθήκευση...';
-    const ok = await persistUpsert(data, !!p, p ? p.id : null);
-    if(ok){
-      closeModal(); render();
-      showToast('Αποθηκεύτηκε.');
-    } else {
-      btn.disabled = false; btn.textContent = 'Αποθήκευση';
-      showToast('⚠ Δεν αποθηκεύτηκε — δοκίμασε ξανά.');
-      // leave the modal open with the user's input intact so they can retry
-    }
-  });
 }
 
-function openQrModal(id){
-  const p = products.find(x=>x.id===id);
-  if(!p) return;
-  const wrap = document.createElement('div');
-  wrap.className='overlay';
-  wrap.innerHTML = `
-    <div class="modal">
-      <h2>Ετικέτα προϊόντος</h2>
-      <div class="qrwrap">
-        <div id="qrcanvas-holder"></div>
-        <div class="qrmeta">${esc(p.code)} — ${esc(p.name)}</div>
-      </div>
-      <div class="field">
-        <label>Μέγεθος ετικέτας (DYMO)</label>
-        <select id="labelSize" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:5px;font-family:'IBM Plex Sans';font-size:15px;">
-          <option value="large">Μεγάλη — 89 × 36 mm</option>
-          <option value="small">Μικρή διπλή — 24 × 12 mm</option>
-        </select>
-      </div>
-      <div class="modalbtns">
-        <button class="iconbtn ghost" id="btnClose">Κλείσιμο</button>
-        <button class="iconbtn signal" id="btnPrint">Εκτύπωση</button>
-      </div>
+function openProductModal(id){
+  const p = id ? productById(id) : null;
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <h3>${p? 'Επεξεργασία είδους':'Νέο είδος'}</h3>
+    <div class="field"><label>Όνομα είδους</label><input id="f-name" value="${p?p.name:''}" placeholder="π.χ. HOT MATERIAL"></div>
+    <div class="field-row">
+      <div class="field"><label>Αρχικό απόθεμα (παλέτες)</label><input id="f-initial" type="number" value="${p?p.initialStock:''}"></div>
+      <div class="field"><label>Σακιά ανά παλέτα</label><input id="f-bpp" type="number" value="${p&&p.bagsPerPallet?p.bagsPerPallet:''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Τιμή παλέτας (€)</label><input id="f-pprice" type="number" step="0.01" value="${p&&p.palletPrice?p.palletPrice:''}"></div>
+      <div class="field"><label>Τιμή σακιού (€)</label><input id="f-bprice" type="number" step="0.01" value="${p&&p.bagPrice?p.bagPrice:''}"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
+      <button class="btn" onclick="saveProduct('${p?p.id:''}')">Αποθήκευση</button>
     </div>
   `;
-  document.body.appendChild(wrap);
-  new QRCode(document.getElementById('qrcanvas-holder'), {
-    text: p.code, width:180, height:180
-  });
-  document.getElementById('btnClose').addEventListener('click', closeModal);
-  wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
-  document.getElementById('btnPrint').addEventListener('click', ()=>{
-    const size = document.getElementById('labelSize').value;
-    printLabel(p, size);
-  });
+  document.getElementById('modalBackdrop').classList.add('open');
 }
-
-function printLabel(p, size){
-  const isSmall = size === 'small';
-  // physical label dimensions in mm (landscape)
-  const pageW = isSmall ? 24 : 89;
-  const pageH = isSmall ? 12 : 36;
-  const qrPx = isSmall ? 80 : 220; // rendered small, then scaled down by CSS to fit the physical mm size
-
-  const win = window.open('', '_blank');
-  win.document.write(`
-    <html>
-    <head>
-    <meta charset="UTF-8">
-    <style>
-      @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
-      html, body { margin:0; padding:0; }
-      body{
-        width:${pageW}mm; height:${pageH}mm;
-        display:flex; flex-direction:column; justify-content:space-between;
-        box-sizing:border-box;
-        font-family: Arial, sans-serif;
-        padding: ${isSmall ? '0.5mm' : '2mm'};
-        overflow:hidden;
-      }
-      .name{
-        font-size:${isSmall?'2mm':'5mm'}; line-height:1.15; font-weight:600;
-        display:${isSmall?'none':'block'};
-        overflow:hidden; max-height:${isSmall?'0':'10mm'};
-      }
-      .bottomrow{
-        display:flex; align-items:center; justify-content:space-between; gap:${isSmall?'0.8mm':'2mm'};
-      }
-      .leftgroup{ display:flex; align-items:center; gap:${isSmall?'0.8mm':'2mm'}; min-width:0; }
-      #qr{ flex:none; }
-      #qr img, #qr canvas, #qr table { width:${isSmall?'9mm':'16mm'} !important; height:${isSmall?'9mm':'16mm'} !important; }
-      .code{
-        font-size:${isSmall?'2mm':'4.5mm'}; font-weight:bold; letter-spacing:0.02em;
-        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-      }
-      .price{
-        font-size:${isSmall?'2.6mm':'12mm'}; font-weight:bold; line-height:1;
-        flex:none; text-align:right;
-      }
-    </style>
-    </head>
-    <body>
-      <div class="name">${esc(p.name)}</div>
-      <div class="bottomrow">
-        <div class="leftgroup">
-          <div id="qr"></div>
-          <div class="code">${esc(p.code)}</div>
-        </div>
-        <div class="price">${Number(p.price||0).toFixed(2)}€</div>
-      </div>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-      <script>
-        new QRCode(document.getElementById('qr'), { text: ${JSON.stringify(p.code)}, width: ${qrPx}, height: ${qrPx} });
-        setTimeout(()=>{ window.print(); }, 300);
-      <\/script>
-    </body>
-    </html>
-  `);
-  win.document.close();
-}
-
-let codeReader = null;
-
-async function openScanModal(){
-  const wrap = document.createElement('div');
-  wrap.className='overlay';
-  wrap.innerHTML = `
-    <div class="modal">
-      <h2>Σάρωση QR / Barcode</h2>
-      <video id="scanvideo" autoplay playsinline muted></video>
-      <div class="scanhint">Δείξε την κάμερα στο QR ή στο barcode του προϊόντος.</div>
-      <div id="scanresultholder"></div>
-      <div class="modalbtns"><button class="iconbtn ghost" id="btnCloseScan">Κλείσιμο</button></div>
-    </div>
-  `;
-  document.body.appendChild(wrap);
-  document.getElementById('btnCloseScan').addEventListener('click', closeModal);
-  wrap.addEventListener('click', e=>{ if(e.target===wrap) closeModal(); });
-
-  const video = document.getElementById('scanvideo');
-
-  if(typeof ZXing === 'undefined'){
-    document.getElementById('scanresultholder').innerHTML =
-      `<div class="scanresult">Η βιβλιοθήκη σάρωσης δεν φορτώθηκε (πρόβλημα σύνδεσης). Δοκίμασε ξανά.</div>`;
-    return;
-  }
-
-  codeReader = new ZXing.BrowserMultiFormatReader();
-
-  try{
-    const devices = await codeReader.listVideoInputDevices();
-    if(!devices || devices.length===0){
-      throw Object.assign(new Error('no camera'), { name: 'NotFoundError' });
-    }
-    const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length-1];
-    const deviceId = backCam ? backCam.deviceId : undefined;
-
-    codeReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
-      if(result){
-        handleScanResult(result.getText());
-      }
-    });
-  }catch(e){
-    const name = e && e.name ? e.name : 'ΑγνωστοΣφάλμα';
-    let msg = 'Δεν υπήρξε πρόσβαση στην κάμερα (' + name + ').';
-    if(name === 'NotAllowedError'){
-      msg += ' Το δικαίωμα κάμερας έχει απορριφθεί για αυτή τη σελίδα — έλεγξε τις ρυθμίσεις δικαιωμάτων του browser για κάμερα.';
-    } else if(name === 'NotFoundError'){
-      msg += ' Δεν βρέθηκε κάμερα στη συσκευή.';
-    } else if(name === 'NotReadableError'){
-      msg += ' Η κάμερα μπορεί να χρησιμοποιείται ήδη από άλλη εφαρμογή.';
-    } else if(name === 'SecurityError' || !navigator.mediaDevices){
-      msg += ' Ο browser μπλοκάρει την κάμερα σε αυτή τη σελίδα (περιορισμός ασφαλείας).';
-    }
-    document.getElementById('scanresultholder').innerHTML =
-      `<div class="scanresult">${esc(msg)}</div>`;
-  }
-}
-
-function handleScanResult(text){
-  let p = null;
-  if(text.startsWith('WH:')){
-    const id = text.slice(3);
-    p = products.find(x=>x.id===id);
-  }
-  if(!p){
-    p = products.find(x=>(x.code||'').trim().toLowerCase() === text.trim().toLowerCase());
-  }
-
-  if(codeReader){ try{ codeReader.reset(); }catch(e){} codeReader=null; }
-  const video = document.getElementById('scanvideo');
-  if(video) video.style.display='none';
-
-  const holder = document.getElementById('scanresultholder');
-  if(p){
-    holder.innerHTML = `
-      <div class="scanresult">
-        <div class="code">${esc(p.code)}</div>
-        <div class="name" style="margin-bottom:6px">${esc(p.name)}</div>
-        <div class="row">
-          <div class="qty" id="scanQtyDisplay">${p.qty}<span>Τεμάχια</span></div>
-          <div class="price">${Number(p.price||0).toFixed(2)}€<span>Τιμή</span></div>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:10px;align-items:stretch;">
-          <input id="sellAmountScan" type="number" value="1" min="1" style="width:64px;padding:8px;border:1.5px solid var(--line);border-radius:5px;font-family:'IBM Plex Mono';font-size:15px;text-align:center;"/>
-          <button class="iconbtn" id="btnSellScan" style="flex:1;background:var(--ok);border-color:var(--ok);">Πούλησα</button>
-        </div>
-      </div>`;
-    document.getElementById('btnSellScan').addEventListener('click', async ()=>{
-      const amountInput = document.getElementById('sellAmountScan');
-      const amt = parseFloat(amountInput.value) || 0;
-      if(amt<=0) return;
-      const btn = document.getElementById('btnSellScan');
-      btn.disabled = true; btn.textContent = '...';
-      const newQty = Math.max(0, p.qty - amt);
-      const data = { ...p, qty: newQty };
-      const ok = await persistUpsert(data, true, p.id);
-      if(ok){
-        p.qty = newQty;
-        document.getElementById('scanQtyDisplay').innerHTML = `${newQty}<span>Τεμάχια</span>`;
-        amountInput.value = 1;
-        btn.disabled = false; btn.textContent = 'Πούλησα';
-        showToast('Ενημερώθηκε το απόθεμα.');
-        render();
-      } else {
-        btn.disabled = false; btn.textContent = 'Πούλησα';
-        showToast('⚠ Δεν ενημερώθηκε — δοκίμασε ξανά.');
-      }
-    });
+async function saveProduct(id){
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ showToast('Βάλε όνομα είδους.'); return; }
+  const initialStock = parseFloat(document.getElementById('f-initial').value)||0;
+  const bagsPerPallet = parseFloat(document.getElementById('f-bpp').value)||null;
+  const palletPrice = parseFloat(document.getElementById('f-pprice').value)||null;
+  const bagPrice = parseFloat(document.getElementById('f-bprice').value)||null;
+  if(id){
+    const p = productById(id);
+    Object.assign(p, {name, initialStock, bagsPerPallet, palletPrice, bagPrice});
   } else {
-    const scannedCode = text.startsWith('WH:') ? '' : text; // WH: codes are our own internal QR ids, not real barcodes
-    holder.innerHTML = `
-      <div class="scanresult">
-        Δεν βρέθηκε προϊόν με κωδικό <b>${esc(text)}</b>.
-        <div class="modalbtns" style="margin-top:10px">
-          <button class="iconbtn signal" id="btnCreateFromScan" style="flex:1">+ Δημιουργία με αυτόν τον κωδικό</button>
-        </div>
-      </div>`;
-    document.getElementById('btnCreateFromScan').addEventListener('click', ()=>{
-      closeModal();
-      openEditModal(null, scannedCode);
-    });
+    DATA.products.push({id:uid('p'), name, initialStock, bagsPerPallet, palletPrice, bagPrice});
   }
+  await saveData();
+  closeModal();
+  renderWarehouse();
+  renderDashboard();
+  showToast('Αποθηκεύτηκε.');
+}
+async function deleteProduct(id){
+  if(!confirm('Διαγραφή είδους; (Οι παραγγελίες που το αναφέρουν θα παραμείνουν)')) return;
+  DATA.products = DATA.products.filter(p=>p.id!==id);
+  await saveData();
+  renderWarehouse();
+  renderDashboard();
 }
 
-loadProducts();
+/* ============================= CUSTOMERS ============================= */
+function renderCustomers(){
+  const el = document.getElementById('view-customers');
+  const rows = DATA.customers.map(c=>`
+    <tr>
+      <td class="mono">${c.id}</td>
+      <td><b>${c.name}</b></td>
+      <td>${c.phone? `<a href="tel:${c.phone}" class="link-btn">${c.phone}</a>` : '—'}</td>
+      <td>${c.address||'—'}</td>
+      <td>${c.mapsLink? `<a href="${c.mapsLink}" target="_blank" class="link-btn">Χάρτης ↗</a>` : '—'}</td>
+      <td>
+        <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
+        <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
+      </td>
+    </tr>
+  `).join('');
+  el.innerHTML = `
+    <div class="toolbar">
+      <p class="section-title" style="margin:0;">Πελάτες (${DATA.customers.length})</p>
+      <button class="btn" onclick="openCustomerModal()">+ Νέος πελάτης</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Όνομα</th><th>Τηλέφωνο</th><th>Διεύθυνση</th><th>Χάρτης</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="6" class="empty">Δεν υπάρχουν πελάτες ακόμα.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
+}
+function nextCustomerId(){
+  const nums = DATA.customers.map(c=>parseInt((c.id||'C000').replace('C',''))||0);
+  const next = (nums.length?Math.max(...nums):0)+1;
+  return 'C'+String(next).padStart(3,'0');
+}
+function openCustomerModal(id){
+  const c = id ? DATA.customers.find(x=>x.id===id) : null;
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <h3>${c?'Επεξεργασία πελάτη':'Νέος πελάτης'}</h3>
+    <div class="field"><label>Όνομα</label><input id="f-cname" value="${c?c.name:''}"></div>
+    <div class="field"><label>Τηλέφωνο</label><input id="f-cphone" value="${c?c.phone:''}"></div>
+    <div class="field"><label>Διεύθυνση</label><input id="f-caddr" value="${c?c.address:''}"></div>
+    <div class="field"><label>Σύνδεσμος Google Maps</label><input id="f-cmaps" value="${c?c.mapsLink:''}"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
+      <button class="btn" onclick="saveCustomer('${c?c.id:''}')">Αποθήκευση</button>
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+async function saveCustomer(id){
+  const name = document.getElementById('f-cname').value.trim();
+  if(!name){ showToast('Βάλε όνομα πελάτη.'); return; }
+  const phone = document.getElementById('f-cphone').value.trim();
+  const address = document.getElementById('f-caddr').value.trim();
+  const mapsLink = document.getElementById('f-cmaps').value.trim();
+  if(id){
+    const c = DATA.customers.find(x=>x.id===id);
+    Object.assign(c, {name, phone, address, mapsLink});
+  } else {
+    DATA.customers.push({id:nextCustomerId(), name, phone, address, mapsLink});
+  }
+  await saveData();
+  closeModal();
+  renderCustomers();
+  showToast('Αποθηκεύτηκε.');
+}
+async function deleteCustomer(id){
+  if(!confirm('Διαγραφή πελάτη;')) return;
+  DATA.customers = DATA.customers.filter(c=>c.id!==id);
+  await saveData();
+  renderCustomers();
+}
+
+/* ============================= ORDERS ============================= */
+let orderSearchQuery = '';
+let completedSearchQuery = '';
+
+function isOrderCompleted(o){
+  if(o.deliveryStatus === 'Ακυρώθηκε') return true;
+  if(o.deliveryStatus === 'Παραδόθηκε' && orderBalance(o) <= 0) return true;
+  return false;
+}
+function matchesSearch(o, q){
+  if(!q) return true;
+  q = q.toLowerCase();
+  return customerName(o.customerId).toLowerCase().includes(q) || productName(o.productId).toLowerCase().includes(q);
+}
+
+function renderOrders(){
+  const el = document.getElementById('view-orders');
+  const list = DATA.orders.filter(o=> !isOrderCompleted(o) && matchesSearch(o, orderSearchQuery));
+  el.innerHTML = orderTableHTML(list, 'orders', false, orderSearchQuery);
+}
+function renderCompleted(){
+  const el = document.getElementById('view-completed');
+  const list = DATA.orders.filter(o=> isOrderCompleted(o) && matchesSearch(o, completedSearchQuery));
+  el.innerHTML = orderTableHTML(list, 'completed', true, completedSearchQuery);
+}
+function onOrderSearch(val, isCompleted){
+  if(isCompleted){ completedSearchQuery = val; renderCompleted(); }
+  else { orderSearchQuery = val; renderOrders(); }
+  // keep focus in the search box after re-render
+  const box = document.getElementById(isCompleted?'search-completed':'search-orders');
+  if(box){ box.focus(); box.selectionStart = box.selectionEnd = box.value.length; }
+}
+function orderTableHTML(list, key, isCompleted, searchVal){
+  const rows = list.map(o=>{
+    const total = orderTotal(o);
+    const balance = orderBalance(o);
+    const delivered = o.deliveredQty ? `${num(o.deliveredQty)} ${o.unit==='Παλέτα'?'παλ.':'σακ.'}` : '—';
+    return `<tr>
+      <td><b>${customerName(o.customerId)}</b></td>
+      <td>${productName(o.productId)}</td>
+      <td class="num">${num(o.quantity)} ${o.unit==='Παλέτα'?'παλ.':'σακ.'}</td>
+      <td class="num cell-strong">${delivered}</td>
+      <td class="num">${eur(o.unitPrice)}</td>
+      <td class="num">${eur(total)}</td>
+      <td>${o.paymentMethod}</td>
+      <td class="num"><span class="${balance>0?'balance-pill':'cell-strong'}">${eur(balance)}</span></td>
+      <td><span class="badge ${badgeClass(o.deliveryStatus)}">${o.deliveryStatus}</span></td>
+      <td>
+        ${balance>0? `<button class="icon-btn" title="Καταχώρηση πληρωμής" onclick="openPaymentModal('${o.id}')">💳</button>` : ''}
+        <button class="icon-btn" onclick="openOrderModal('${o.id}')">✎</button>
+        <button class="icon-btn" onclick="deleteOrder('${o.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  const searchId = isCompleted ? 'search-completed' : 'search-orders';
+  return `
+    <div class="toolbar">
+      <p class="section-title" style="margin:0;">${isCompleted? 'Ολοκληρωμένες / Ακυρωμένες' : 'Ενεργές παραγγελίες'} (${list.length})</p>
+      ${isCompleted? '' : `<button class="btn" onclick="openOrderModal()">+ Νέα παραγγελία</button>`}
+    </div>
+    <div class="field" style="max-width:320px;">
+      <input id="${searchId}" type="search" placeholder="Αναζήτηση πελάτη ή είδους…" value="${searchVal||''}" oninput="onOrderSearch(this.value, ${isCompleted?'true':'false'})">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Πελάτης</th><th>Είδος</th><th class="num">Ποσότητα</th><th class="num">Παραδομένη Ποσ.</th><th class="num">Τιμή</th>
+          <th class="num">Σύνολο</th><th>Πληρωμή</th><th class="num">Υπόλοιπο</th><th>Κατάσταση</th><th></th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="10" class="empty">Καμία εγγραφή.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
+}
+function openOrderModal(id){
+  const o = id ? DATA.orders.find(x=>x.id===id) : null;
+  const body = document.getElementById('modalBody');
+  const custOptions = DATA.customers.map(c=>`<option value="${c.id}" ${o&&o.customerId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const prodOptions = DATA.products.map(p=>`<option value="${p.id}" ${o&&o.productId===p.id?'selected':''}>${p.name}</option>`).join('');
+  const unitOptions = UNITS.map(u=>`<option value="${u}" ${o&&o.unit===u?'selected':''}>${u}</option>`).join('');
+  const payOptions = PAYMENT_METHODS.map(m=>`<option value="${m}" ${o&&o.paymentMethod===m?'selected':''}>${m}</option>`).join('');
+  const statusOptions = DELIVERY_STATUSES.map(s=>`<option value="${s}" ${o&&o.deliveryStatus===s?'selected':''}>${s}</option>`).join('');
+  body.innerHTML = `
+    <h3>${o?'Επεξεργασία παραγγελίας':'Νέα παραγγελία'}</h3>
+    <div class="field"><label>Πελάτης</label><select id="f-customer">${custOptions}</select></div>
+    <div class="field"><label>Είδος</label><select id="f-product" onchange="autoFillPrice()">${prodOptions}</select></div>
+    <div class="field-row">
+      <div class="field"><label>Ποσότητα</label><input id="f-qty" type="number" step="0.01" value="${o?o.quantity:1}" oninput="updateStatusDisplay()"></div>
+      <div class="field"><label>Μονάδα</label><select id="f-unit">${unitOptions}</select></div>
+    </div>
+    <div class="field"><label>Τιμή μονάδας (€)</label><input id="f-uprice" type="number" step="0.01" value="${o?o.unitPrice:''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Τρόπος πληρωμής</label><select id="f-pay">${payOptions}</select></div>
+      <div class="field"><label>Ποσό που πληρώθηκε (€)</label><input id="f-paid" type="number" step="0.01" value="${o?o.paidAmount:0}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Κατάσταση παράδοσης</label>
+        <div id="status-display" class="badge ${badgeClass(o?o.deliveryStatus:'Εκκρεμεί')}" style="display:inline-block;padding:8px 12px;">${o?o.deliveryStatus:'Εκκρεμεί'}</div>
+      </div>
+      <div class="field"><label>Παραδομένη ποσότητα</label><input id="f-delqty" type="number" step="0.01" value="${o?o.deliveredQty:0}" oninput="updateStatusDisplay()"></div>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:500;">
+        <input type="checkbox" id="f-cancelled" style="width:auto;" ${o&&o.deliveryStatus==='Ακυρώθηκε'?'checked':''} onchange="updateStatusDisplay()"> Η παραγγελία ακυρώθηκε
+      </label>
+    </div>
+    <div class="field"><label>Ημ/νία παράδοσης</label><input id="f-deldate" type="date" value="${o&&o.deliveryDate?o.deliveryDate:''}"></div>
+    <div class="field"><label>Σημειώσεις</label><textarea id="f-notes" rows="2">${o?o.notes||'':''}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
+      <button class="btn" onclick="saveOrder('${o?o.id:''}')">Αποθήκευση</button>
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('open');
+  if(!o) autoFillPrice();
+}
+function autoFillPrice(){
+  const pid = document.getElementById('f-product').value;
+  const unit = document.getElementById('f-unit').value;
+  const p = productById(pid);
+  const priceEl = document.getElementById('f-uprice');
+  if(p && !priceEl.value){
+    priceEl.value = unit==='Παλέτα' ? (p.palletPrice||'') : (p.bagPrice||'');
+  }
+}
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id==='f-unit') autoFillPrice();
+});
+function computeAutoStatus(quantity, deliveredQty, cancelled){
+  if(cancelled) return 'Ακυρώθηκε';
+  if(!deliveredQty || deliveredQty<=0) return 'Εκκρεμεί';
+  if(deliveredQty >= quantity) return 'Παραδόθηκε';
+  return 'Μερική Παράδοση';
+}
+function updateStatusDisplay(){
+  const qty = parseFloat(document.getElementById('f-qty').value)||0;
+  const delQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  const cancelled = document.getElementById('f-cancelled').checked;
+  const status = computeAutoStatus(qty, delQty, cancelled);
+  const disp = document.getElementById('status-display');
+  disp.textContent = status;
+  disp.className = 'badge ' + badgeClass(status);
+}
+async function saveOrder(id){
+  const customerId = document.getElementById('f-customer').value;
+  const productId = document.getElementById('f-product').value;
+  const quantity = parseFloat(document.getElementById('f-qty').value)||0;
+  const unit = document.getElementById('f-unit').value;
+  const unitPrice = parseFloat(document.getElementById('f-uprice').value)||0;
+  const paymentMethod = document.getElementById('f-pay').value;
+  const paidAmount = parseFloat(document.getElementById('f-paid').value)||0;
+  const deliveredQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  const cancelled = document.getElementById('f-cancelled').checked;
+  const deliveryStatus = computeAutoStatus(quantity, deliveredQty, cancelled);
+  const deliveryDate = document.getElementById('f-deldate').value || null;
+  const notes = document.getElementById('f-notes').value;
+  const fields = {customerId, productId, quantity, unit, unitPrice, paymentMethod, paidAmount, deliveryStatus, deliveredQty, deliveryDate, notes};
+  if(id){
+    const o = DATA.orders.find(x=>x.id===id);
+    Object.assign(o, fields);
+  } else {
+    DATA.orders.push({id:uid('o'), date:new Date().toISOString().slice(0,10), ...fields});
+  }
+  await saveData();
+  closeModal();
+  renderOrders(); renderCompleted(); renderDashboard();
+  showToast('Αποθηκεύτηκε.');
+}
+async function deleteOrder(id){
+  if(!confirm('Διαγραφή παραγγελίας;')) return;
+  DATA.orders = DATA.orders.filter(o=>o.id!==id);
+  await saveData();
+  renderOrders(); renderCompleted(); renderDashboard();
+}
+
+/* ---- Quick payment ---- */
+function openPaymentModal(id){
+  const o = DATA.orders.find(x=>x.id===id);
+  if(!o) return;
+  const balance = orderBalance(o);
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <h3>Καταχώρηση πληρωμής</h3>
+    <div class="field"><label>Πελάτης</label><div class="cell-strong" style="font-size:15px;">${customerName(o.customerId)} — ${productName(o.productId)}</div></div>
+    <div class="field"><label>Τρέχον υπόλοιπο</label><div class="cell-strong" style="font-size:16px;color:var(--rust-deep);">${eur(balance)}</div></div>
+    <div class="field"><label>Ποσό πληρωμής (€)</label><input id="f-payAmount" type="number" step="0.01" value="${round2(balance)}"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
+      <button class="btn" onclick="confirmPayment('${o.id}')">Καταχώρηση</button>
+    </div>
+  `;
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+async function confirmPayment(id){
+  const o = DATA.orders.find(x=>x.id===id);
+  if(!o) return;
+  const amount = parseFloat(document.getElementById('f-payAmount').value)||0;
+  if(amount<=0){ showToast('Βάλε ποσό μεγαλύτερο από 0.'); return; }
+  o.paidAmount = (Number(o.paidAmount)||0) + amount;
+  await saveData();
+  closeModal();
+  renderOrders(); renderCompleted(); renderDashboard();
+  showToast('Η πληρωμή καταχωρήθηκε.');
+}
+
+/* ============================= DELIVERY SLIP ============================= */
+function renderSlip(selectedId){
+  const el = document.getElementById('view-slip');
+  const options = DATA.orders.map(o=>`<option value="${o.id}" ${selectedId===o.id?'selected':''}>${customerName(o.customerId)} — ${productName(o.productId)} (${num(o.quantity)} ${o.unit})</option>`).join('');
+  const o = selectedId ? DATA.orders.find(x=>x.id===selectedId) : DATA.orders[0];
+  el.innerHTML = `
+    <div class="slip-wrap">
+      <div class="slip-picker card">
+        <p class="section-title">Επιλογή παραγγελίας</p>
+        <div class="field"><select id="slip-select" onchange="renderSlip(this.value)">${options}</select></div>
+        <button class="btn" style="width:100%;margin-top:6px;" onclick="window.print()">🖨 Εκτύπωση δελτίου</button>
+      </div>
+      ${o ? slipHTML(o) : '<div class="empty">Δεν υπάρχουν παραγγελίες.</div>'}
+    </div>
+  `;
+}
+function slipHTML(o){
+  const total = orderTotal(o);
+  const balance = orderBalance(o);
+  const c = DATA.customers.find(x=>x.id===o.customerId);
+  return `
+    <div class="slip">
+      <h2>Δελτίο Αποστολής</h2>
+      <div class="slip-sub">ΠΕΛΛΕΤ &middot; ${new Date().toLocaleDateString('el-GR')}</div>
+      <div class="slip-row"><span class="k">Πελάτης</span><span class="v">${c?c.name:'—'}</span></div>
+      ${c&&c.address? `<div class="slip-row"><span class="k">Διεύθυνση</span><span class="v" style="font-family:'Work Sans';font-weight:500;">${c.address}</span></div>`:''}
+      ${c&&c.phone? `<div class="slip-row"><span class="k">Τηλέφωνο</span><span class="v">${c.phone}</span></div>`:''}
+      <div class="slip-row"><span class="k">Είδος</span><span class="v" style="font-family:'Work Sans';font-weight:600;">${productName(o.productId)}</span></div>
+      <div class="slip-row"><span class="k">Ποσότητα</span><span class="v">${num(o.quantity)} ${o.unit}</span></div>
+      <div class="slip-row"><span class="k">Τιμή μονάδας</span><span class="v">${eur(o.unitPrice)}</span></div>
+      <div class="slip-row"><span class="k">Τρόπος πληρωμής</span><span class="v" style="font-family:'Work Sans';font-weight:500;">${o.paymentMethod}</span></div>
+      <div class="slip-row"><span class="k">Πληρώθηκε</span><span class="v">${eur(o.paidAmount)}</span></div>
+      <div class="slip-row"><span class="k">Υπόλοιπο</span><span class="v">${eur(balance)}</span></div>
+      <div class="slip-total"><span>Σύνολο</span><span>${eur(total)}</span></div>
+      <div class="slip-thanks">Ευχαριστούμε για την προτίμηση!</div>
+    </div>
+  `;
+}
+
+/* ============================= EXCEL BACKUP EXPORT ============================= */
+function exportToExcel(){
+  if(typeof XLSX === 'undefined'){ showToast('Η βιβλιοθήκη Excel δεν φόρτωσε ακόμα — δοκίμασε ξανά σε λίγο.'); return; }
+  const wb = XLSX.utils.book_new();
+
+  // --- Σύνοψη ---
+  const summaryRows = [['Είδος','Διαθέσιμο Απόθεμα (Παλέτες)','Τιμή Παλέτας (€)','Αξία Αποθέματος (€)','Προς Παράδοση (Παλέτες)','Ανεξόφλητα Ποσά (€)']];
+  DATA.products.forEach(p=>{
+    const s = productStats(p.id);
+    summaryRows.push([p.name, round2(s.available), p.palletPrice||'', round2(s.value), round2(s.toDeliver), round2(s.unpaid)]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Σύνοψη');
+
+  // --- Αποθήκη Πελλετ ---
+  const whRows = [['Είδος','Αρχικό Απόθεμα (Παλέτες)','Σακιά ανά Παλέτα','Παραγγελθέντα (Παλέτες)','Διαθέσιμο Απόθεμα (Παλέτες)','Παραδομένα (Παλέτες)','Προς Παράδοση (Παλέτες)','Τιμή Παλέτας (€)','Τιμή Σακιού (€)']];
+  DATA.products.forEach(p=>{
+    const s = productStats(p.id);
+    whRows.push([p.name, p.initialStock, p.bagsPerPallet||'', round2(s.ordered), round2(s.available), round2(s.delivered), round2(s.toDeliver), p.palletPrice||'', p.bagPrice||'']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(whRows), 'Αποθήκη Πελλετ');
+
+  // --- Πελάτες ---
+  const custRows = [['ID','Όνομα','Τηλέφωνο','Διεύθυνση','Σύνδεσμος Google Maps']];
+  DATA.customers.forEach(c=> custRows.push([c.id, c.name, c.phone||'', c.address||'', c.mapsLink||'']));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(custRows), 'Πελάτες');
+
+  // --- Παραγγελίες (active) & Ολοκληρωμένες ---
+  const orderHeader = ['Α/Α','Ημερομηνία Παραγγελίας','Πελάτης','Είδος','Ποσότητα','Μονάδα','Τιμή Μονάδας (€)','Σύνολο (€)','Τρόπος Πληρωμής','Ποσό που Πληρώθηκε (€)','Υπόλοιπο Πληρωμής (€)','Κατάσταση Παράδοσης','Παραδομένη Ποσότητα','Ημ/νία Παράδοσης','Σημειώσεις'];
+  const toRow = (o,i)=>[i+1, o.date||'', customerName(o.customerId), productName(o.productId), o.quantity, o.unit, o.unitPrice, round2(orderTotal(o)), o.paymentMethod, o.paidAmount, round2(orderBalance(o)), o.deliveryStatus, o.deliveredQty||0, o.deliveryDate||'', o.notes||''];
+  const active = DATA.orders.filter(o=> !isOrderCompleted(o));
+  const done = DATA.orders.filter(o=> isOrderCompleted(o));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([orderHeader, ...active.map(toRow)]), 'Παραγγελίες');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([orderHeader, ...done.map(toRow)]), 'Ολοκληρωμένες Παραγγελίες');
+
+  const stamp = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `ΠΕΛΛΕΤ_backup_${stamp}.xlsx`);
+  showToast('Το backup κατέβηκε.');
+}
+function round2(n){ return Math.round((Number(n)||0)*100)/100; }
+
+/* ============================= MODAL ============================= */
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
+document.getElementById('modalBackdrop').addEventListener('click', (e)=>{
+  if(e.target.id==='modalBackdrop') closeModal();
+});
+
+/* ============================= INIT ============================= */
+loadData();
 </script>
 </body>
 </html>
