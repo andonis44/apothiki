@@ -320,7 +320,7 @@ function jsonpLoad(){
     setTimeout(()=>{
       if(done) return; done = true;
       delete window[cbName]; script.remove(); resolve({success:false});
-    }, 10000);
+    }, 15000);
   });
 }
 
@@ -355,25 +355,45 @@ function iframePost(dataStr){
   });
 }
 
+let dataSynced = false; // becomes true only after a CONFIRMED successful read from the sheet
+
 async function loadData(){
-  const res = await jsonpLoad();
-  if(res && res.success && res.data && res.data !== '{}'){
-    try{
-      const parsed = JSON.parse(res.data);
-      DATA = (parsed && parsed.products) ? parsed : seedData();
-    }catch(e){
-      DATA = seedData();
+  let res = await jsonpLoad();
+  if(!res || !res.success){
+    res = await jsonpLoad(); // retry once — Apps Script cold starts can be slow
+  }
+  if(res && res.success){
+    if(res.data && res.data !== '{}'){
+      try{
+        const parsed = JSON.parse(res.data);
+        DATA = (parsed && parsed.products) ? parsed : seedData();
+      }catch(e){
+        DATA = seedData();
+      }
+    } else {
+      DATA = seedData(); // genuinely empty sheet — safe to initialize
     }
+    dataSynced = true;
+    if(res.data === '{}' || !res.data){ await saveData(); } // persist the seed only on a truly fresh sheet
   } else {
     DATA = seedData();
+    dataSynced = false;
+    showConnectionError();
   }
   document.getElementById('loadingMsg').style.display = 'none';
   renderAll();
-  if(!res || !res.success || !res.data || res.data === '{}'){
-    await saveData(); // persist the seed on first run so the sheet isn't empty
-  }
+}
+function showConnectionError(){
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#F2DED4;color:#7E2F12;padding:10px 16px;text-align:center;font-size:13px;font-weight:600;position:sticky;top:0;z-index:60;';
+  banner.textContent = '⚠ Δεν ήταν δυνατή η σύνδεση με τη βάση δεδομένων. Οι αλλαγές ΔΕΝ θα αποθηκευτούν — κάνε ανανέωση (refresh) της σελίδας πριν συνεχίσεις.';
+  document.body.insertBefore(banner, document.body.firstChild);
 }
 async function saveData(){
+  if(!dataSynced){
+    showToast('⚠ Χωρίς σύνδεση — η αλλαγή ΔΕΝ αποθηκεύτηκε. Κάνε refresh.');
+    return;
+  }
   await iframePost(JSON.stringify(DATA));
 }
 
