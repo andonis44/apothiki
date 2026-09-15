@@ -479,6 +479,7 @@ function renderAll(){
 }
 
 function renderView(view){
+  if(!DATA) return;
   if(view==='dashboard') renderDashboard();
   if(view==='warehouse') renderWarehouse();
   if(view==='customers') renderCustomers();
@@ -607,9 +608,20 @@ async function deleteProduct(id){
 }
 
 /* ============================= CUSTOMERS ============================= */
-function renderCustomers(){
-  const el = document.getElementById('view-customers');
-  const rows = DATA.customers.map(c=>`
+/* Αναζήτηση πελατών: αγνοεί τόνους/κεφαλαία, δέχεται και greeklish (π.χ. "veroia" → Βέροια) */
+let customerSearch = '';
+const GR2LAT = {'α':'a','β':'v','γ':'g','δ':'d','ε':'e','ζ':'z','η':'i','θ':'8','ι':'i','κ':'k','λ':'l','μ':'m','ν':'n','ξ':'q','ο':'o','π':'p','ρ':'r','σ':'s','ς':'s','τ':'t','υ':'i','φ':'f','χ':'x','ψ':'ps','ω':'o'};
+function searchKey(str){
+  let s = String(str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  s = s.replace(/[α-ω]|ς/g, ch => GR2LAT[ch] ?? ch);
+  return s
+    .replace(/th/g,'8').replace(/ch|kh/g,'x').replace(/ks/g,'q')
+    .replace(/h/g,'i').replace(/[yu]/g,'i').replace(/w/g,'o')
+    .replace(/b/g,'v').replace(/c/g,'k').replace(/j/g,'g')
+    .replace(/\s+/g,' ').trim();
+}
+function customerRowHTML(c){
+  return `
     <tr>
       <td class="mono">${c.id}</td>
       <td><b>${c.name}</b></td>
@@ -620,20 +632,59 @@ function renderCustomers(){
         <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
         <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+}
+function renderCustomers(){
+  const el = document.getElementById('view-customers');
   el.innerHTML = `
     <div class="toolbar">
-      <p class="section-title" style="margin:0;">Πελάτες (${DATA.customers.length})</p>
+      <p class="section-title" style="margin:0;" id="customersCount"></p>
       <button class="btn" onclick="openCustomerModal()">+ Νέος πελάτης</button>
+    </div>
+    <div class="field" style="max-width:320px;">
+      <input id="customerSearchInput" type="search" autocomplete="off"
+        placeholder="Αναζήτηση: όνομα, τηλέφωνο, περιοχή…"
+        value="${customerSearch.replace(/"/g,'&quot;')}"
+        oninput="onCustomerSearch(this.value)"
+        onkeydown="if(event.key==='Escape'){this.value='';onCustomerSearch('');}">
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>ID</th><th>Όνομα</th><th>Τηλέφωνο</th><th>Διεύθυνση</th><th>Χάρτης</th><th></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="6" class="empty">Δεν υπάρχουν πελάτες ακόμα.</td></tr>`}</tbody>
+        <tbody id="customersBody"></tbody>
       </table>
     </div>
   `;
+  fillCustomerRows();
+}
+function onCustomerSearch(val){ customerSearch = val; fillCustomerRows(); }
+function fillCustomerRows(){
+  const body = document.getElementById('customersBody');
+  if(!body) return;
+  const terms = searchKey(customerSearch).split(' ').filter(Boolean);
+  const qDigits = customerSearch.replace(/\D/g,'');
+  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/x/g,'[xq]'); // greeklish x = χ ή ξ
+  const list = DATA.customers.filter(c=>{
+    if(!terms.length) return true;
+    const hay = searchKey([c.id, c.name, c.phone, c.address].join(' '));
+    if(terms.every(t=>new RegExp(esc(t)).test(hay))) return true;
+    return qDigits.length>=3 && /^[\d\s\-+().]+$/.test(customerSearch.trim())
+      && String(c.phone||'').replace(/\D/g,'').includes(qDigits);
+  });
+  const total = DATA.customers.length;
+  document.getElementById('customersCount').textContent =
+    terms.length ? `Πελάτες (${list.length} από ${total})` : `Πελάτες (${total})`;
+  let emptyMsg = 'Δεν υπάρχουν πελάτες ακόμα.';
+  if(total && terms.length){
+    emptyMsg = `Κανένας πελάτης δεν ταιριάζει με «${customerSearch.replace(/[<>&"]/g,'')}». <button class="link-btn" onclick="clearCustomerSearch()">Καθαρισμός αναζήτησης</button>`;
+  }
+  body.innerHTML = list.map(customerRowHTML).join('') || `<tr><td colspan="6" class="empty">${emptyMsg}</td></tr>`;
+}
+function clearCustomerSearch(){
+  customerSearch = '';
+  const inp = document.getElementById('customerSearchInput');
+  if(inp){ inp.value=''; inp.focus(); }
+  fillCustomerRows();
 }
 function nextCustomerId(){
   const nums = DATA.customers.map(c=>parseInt((c.id||'C000').replace('C',''))||0);
