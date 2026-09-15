@@ -628,7 +628,8 @@ function customerRowHTML(c){
       <td>${c.phone? `<a href="tel:${c.phone}" class="link-btn">${c.phone}</a>` : '—'}</td>
       <td>${c.address||'—'}</td>
       <td>${c.mapsLink? `<a href="${c.mapsLink}" target="_blank" class="link-btn">Χάρτης ↗</a>` : '—'}</td>
-      <td>
+      <td style="white-space:nowrap;">
+        <button class="btn small" title="Νέα παραγγελία για αυτόν τον πελάτη" onclick="newOrderForCustomer('${c.id}')">+ Παραγγελία</button>
         <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
         <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
       </td>
@@ -861,10 +862,14 @@ function orderTableHTML(list, key, isCompleted, searchVal){
     </div>
   `;
 }
-function openOrderModal(id){
+function newOrderForCustomer(customerId){
+  document.querySelector('.tab[data-view="orders"]').click(); // μετάβαση στην καρτέλα Παραγγελίες
+  openOrderModal(null, customerId);
+}
+function openOrderModal(id, presetCustomerId){
   const o = id ? DATA.orders.find(x=>x.id===id) : null;
   const body = document.getElementById('modalBody');
-  const custOptions = DATA.customers.map(c=>`<option value="${c.id}" ${o&&o.customerId===c.id?'selected':''}>${c.name}</option>`).join('');
+  const custOptions = DATA.customers.map(c=>`<option value="${c.id}" ${(o? o.customerId===c.id : presetCustomerId===c.id)?'selected':''}>${c.name}</option>`).join('');
   const prodOptions = DATA.products.map(p=>`<option value="${p.id}" ${o&&o.productId===p.id?'selected':''}>${p.name}</option>`).join('');
   const unitOptions = UNITS.map(u=>`<option value="${u}" ${o&&o.unit===u?'selected':''}>${u}</option>`).join('');
   const payOptions = PAYMENT_METHODS.map(m=>`<option value="${m}" ${o&&o.paymentMethod===m?'selected':''}>${m}</option>`).join('');
@@ -903,6 +908,11 @@ function openOrderModal(id){
   `;
   document.getElementById('modalBackdrop').classList.add('open');
   if(!o) autoFillPrice();
+  if(!o && presetCustomerId){
+    const sel = document.getElementById('f-customer');
+    sel.style.fontWeight = '700';
+    setTimeout(()=>document.getElementById('f-product').focus(), 50); // έτοιμο για επιλογή είδους
+  }
 }
 function autoFillPrice(){
   const pid = document.getElementById('f-product').value;
