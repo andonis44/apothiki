@@ -691,28 +691,84 @@ function nextCustomerId(){
   const next = (nums.length?Math.max(...nums):0)+1;
   return 'C'+String(next).padStart(3,'0');
 }
+/* ---- Έλεγχος διπλοεγγραφής πελάτη ---- */
+function phoneKey(p){ const d = String(p||'').replace(/\D/g,''); return d.length>=7 ? d.slice(-10) : ''; }
+function nameWords(n){ return searchKey(n).split(' ').filter(w=>w.length>=3); }
+function findDuplicateCustomers(name, phone, excludeId){
+  const pk = phoneKey(phone);
+  const nk = searchKey(name);
+  const nw = nameWords(name);
+  const out = [];
+  DATA.customers.forEach(c=>{
+    if(c.id===excludeId) return;
+    const reasons = [];
+    if(pk && phoneKey(c.phone)===pk) reasons.push('ίδιο τηλέφωνο');
+    if(nk){
+      const ck = searchKey(c.name);
+      const cw = nameWords(c.name);
+      if(ck===nk) reasons.push('ίδιο όνομα');
+      else if(nw.length && cw.length){
+        const [small, big] = nw.length<=cw.length ? [nw, cw] : [cw, nw];
+        if(small.every(w=>big.includes(w))) reasons.push('παρόμοιο όνομα');
+      }
+    }
+    if(reasons.length) out.push({c, reasons});
+  });
+  // πρώτα όσοι έχουν ίδιο τηλέφωνο
+  return out.sort((x,y)=> (y.reasons.includes('ίδιο τηλέφωνο')) - (x.reasons.includes('ίδιο τηλέφωνο')));
+}
+function dupListHTML(dups){
+  return dups.map(({c,reasons})=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #E8C9BB;">
+      <div><b>${c.name}</b> <span class="mono" style="font-size:11px;">${c.id}</span><br>
+        <span style="font-size:12px;">${[c.phone,c.address].filter(Boolean).join(' · ')||'—'} — <i>${reasons.join(', ')}</i></span></div>
+      <button class="btn small secondary" onclick="openCustomerModal('${c.id}')">Άνοιγμα</button>
+    </div>`).join('');
+}
+function updateDupHint(excludeId){
+  const box = document.getElementById('dup-hint');
+  if(!box) return;
+  const dups = findDuplicateCustomers(document.getElementById('f-cname').value, document.getElementById('f-cphone').value, excludeId);
+  if(!dups.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML = `<div style="font-weight:700;margin-bottom:4px;">⚠ Υπάρχει ήδη παρόμοιος πελάτης:</div>${dupListHTML(dups)}`;
+}
 function openCustomerModal(id){
   const c = id ? DATA.customers.find(x=>x.id===id) : null;
   const body = document.getElementById('modalBody');
+  const ex = c?c.id:'';
   body.innerHTML = `
     <h3>${c?'Επεξεργασία πελάτη':'Νέος πελάτης'}</h3>
-    <div class="field"><label>Όνομα</label><input id="f-cname" value="${c?c.name:''}"></div>
-    <div class="field"><label>Τηλέφωνο</label><input id="f-cphone" value="${c?c.phone:''}"></div>
+    <div class="field"><label>Όνομα</label><input id="f-cname" value="${c?c.name:''}" oninput="updateDupHint('${ex}')" autocomplete="off"></div>
+    <div class="field"><label>Τηλέφωνο</label><input id="f-cphone" value="${c?c.phone:''}" oninput="updateDupHint('${ex}')" autocomplete="off"></div>
+    <div id="dup-hint" style="display:none;background:#F7E9E2;color:var(--rust-deep);border:1px solid #E8C9BB;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px;"></div>
     <div class="field"><label>Διεύθυνση</label><input id="f-caddr" value="${c?c.address:''}"></div>
     <div class="field"><label>Σύνδεσμος Google Maps</label><input id="f-cmaps" value="${c?c.mapsLink:''}"></div>
-    <div class="modal-actions">
+    <div class="modal-actions" id="customer-actions">
       <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
-      <button class="btn" onclick="saveCustomer('${c?c.id:''}')">Αποθήκευση</button>
+      <button class="btn" onclick="saveCustomer('${ex}')">Αποθήκευση</button>
     </div>
   `;
   document.getElementById('modalBackdrop').classList.add('open');
+  if(c) updateDupHint(ex);
 }
-async function saveCustomer(id){
+async function saveCustomer(id, force){
   const name = document.getElementById('f-cname').value.trim();
   if(!name){ showToast('Βάλε όνομα πελάτη.'); return; }
   const phone = document.getElementById('f-cphone').value.trim();
   const address = document.getElementById('f-caddr').value.trim();
   const mapsLink = document.getElementById('f-cmaps').value.trim();
+  if(!force){
+    const dups = findDuplicateCustomers(name, phone, id||null);
+    if(dups.length){
+      updateDupHint(id||'');
+      document.getElementById('customer-actions').innerHTML = `
+        <button class="btn secondary" onclick="closeModal()">Άκυρο</button>
+        <button class="btn danger" onclick="saveCustomer('${id||''}', true)">Είναι άλλος πελάτης — αποθήκευση</button>`;
+      showToast('Έλεγξε: υπάρχει ήδη παρόμοιος πελάτης.');
+      return;
+    }
+  }
   if(id){
     const c = DATA.customers.find(x=>x.id===id);
     Object.assign(c, {name, phone, address, mapsLink});
