@@ -320,7 +320,7 @@ function jsonpLoad(){
     setTimeout(()=>{
       if(done) return; done = true;
       delete window[cbName]; script.remove(); resolve({success:false});
-    }, 10000);
+    }, 15000);
   });
 }
 
@@ -355,46 +355,43 @@ function iframePost(dataStr){
   });
 }
 
-let dataSynced = false; // true μόνο αφού διαβαστούν επιτυχώς τα δεδομένα από το Sheet
+let dataSynced = false; // becomes true only after a CONFIRMED successful read from the sheet
+
 async function loadData(){
   let res = await jsonpLoad();
-  if(!res || !res.success) res = await jsonpLoad(); // 2η προσπάθεια (το Apps Script αργεί να "ξυπνήσει")
-  document.getElementById('loadingMsg').style.display = 'none';
   if(!res || !res.success){
-    showSyncError();
-    return; // ΔΕΝ φορτώνουμε/αποθηκεύουμε δοκιμαστικά δεδομένα — προστασία από διαγραφή
+    res = await jsonpLoad(); // retry once — Apps Script cold starts can be slow
   }
-  let isEmpty = !res.data || res.data === '{}';
-  if(!isEmpty){
-    try{
-      const parsed = JSON.parse(res.data);
-      if(!(parsed && parsed.products)) throw new Error('bad data');
-      DATA = parsed;
-    }catch(e){
-      showSyncError();
-      return;
+  if(res && res.success){
+    if(res.data && res.data !== '{}'){
+      try{
+        const parsed = JSON.parse(res.data);
+        DATA = (parsed && parsed.products) ? parsed : seedData();
+      }catch(e){
+        DATA = seedData();
+      }
+    } else {
+      DATA = seedData(); // genuinely empty sheet — safe to initialize
     }
+    dataSynced = true;
+    if(res.data === '{}' || !res.data){ await saveData(); } // persist the seed only on a truly fresh sheet
   } else {
     DATA = seedData();
+    dataSynced = false;
+    showConnectionError();
   }
-  dataSynced = true;
+  document.getElementById('loadingMsg').style.display = 'none';
   renderAll();
-  if(isEmpty) await saveData(); // πρώτη φορά: άδειο Sheet
 }
-function showSyncError(){
-  let b = document.getElementById('syncErrorBanner');
-  if(!b){
-    b = document.createElement('div');
-    b.id = 'syncErrorBanner';
-    b.style.cssText = 'background:#8B1E1E;color:#fff;padding:12px 16px;border-radius:6px;margin:0 0 16px;font-size:14px;font-weight:600;';
-    b.innerHTML = '⚠ Δεν ήταν δυνατή η σύνδεση με το Google Sheet. Οι αλλαγές ΔΕΝ αποθηκεύονται. <button class="btn small" style="margin-left:8px;" onclick="location.reload()">Ξαναδοκίμασε</button>';
-    const app = document.getElementById('app');
-    app.insertBefore(b, app.querySelector('.tabs'));
-  }
+function showConnectionError(){
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#F2DED4;color:#7E2F12;padding:10px 16px;text-align:center;font-size:13px;font-weight:600;position:sticky;top:0;z-index:60;';
+  banner.textContent = '⚠ Δεν ήταν δυνατή η σύνδεση με τη βάση δεδομένων. Οι αλλαγές ΔΕΝ θα αποθηκευτούν — κάνε ανανέωση (refresh) της σελίδας πριν συνεχίσεις.';
+  document.body.insertBefore(banner, document.body.firstChild);
 }
 async function saveData(){
   if(!dataSynced){
-    showToast('Δεν αποθηκεύτηκε — δεν υπάρχει σύνδεση με το Google Sheet.');
+    showToast('⚠ Χωρίς σύνδεση — η αλλαγή ΔΕΝ αποθηκεύτηκε. Κάνε refresh.');
     return;
   }
   await iframePost(JSON.stringify(DATA));
@@ -413,7 +410,7 @@ function eur(n){
   if(n===null||n===undefined||isNaN(n)) return '—';
   return n.toLocaleString('el-GR',{minimumFractionDigits:0,maximumFractionDigits:2}) + ' €';
 }
-function num(n,d=2){ if(n===null||n===undefined||isNaN(n)) return '—'; return Number(n).toLocaleString('el-GR',{maximumFractionDigits:d}); }
+function num(n,d=0){ if(n===null||n===undefined||isNaN(n)) return '—'; return Number(n).toLocaleString('el-GR',{maximumFractionDigits:d}); }
 function customerName(id){ return DATA.customers.find(c=>c.id===id)?.name || '—'; }
 function productName(id){ return DATA.products.find(p=>p.id===id)?.name || '—'; }
 function productById(id){ return DATA.products.find(p=>p.id===id); }
@@ -448,7 +445,7 @@ function productStats(productId){
   let ordered = 0, delivered = 0, unpaid = 0;
   orders.forEach(o=>{
     ordered += toPallets(o);
-    if(o.deliveryStatus !== 'Ακυρώθηκε' && Number(o.deliveredQty)>0){
+    if(o.deliveryStatus === 'Παραδόθηκε' || o.deliveryStatus === 'Μερική Παράδοση'){
       const p2 = productById(o.productId);
       if(o.unit === 'Παλέτα'){ delivered += Number(o.deliveredQty)||0; }
       else if(p2 && p2.bagsPerPallet){ delivered += (Number(o.deliveredQty)||0)/p2.bagsPerPallet; }
@@ -482,7 +479,6 @@ function renderAll(){
 }
 
 function renderView(view){
-  if(!DATA) return;
   if(view==='dashboard') renderDashboard();
   if(view==='warehouse') renderWarehouse();
   if(view==='customers') renderCustomers();
@@ -611,20 +607,9 @@ async function deleteProduct(id){
 }
 
 /* ============================= CUSTOMERS ============================= */
-/* Αναζήτηση πελατών: αγνοεί τόνους/κεφαλαία, δέχεται και greeklish (π.χ. "veroia" → Βέροια) */
-let customerSearch = '';
-const GR2LAT = {'α':'a','β':'v','γ':'g','δ':'d','ε':'e','ζ':'z','η':'i','θ':'8','ι':'i','κ':'k','λ':'l','μ':'m','ν':'n','ξ':'q','ο':'o','π':'p','ρ':'r','σ':'s','ς':'s','τ':'t','υ':'i','φ':'f','χ':'x','ψ':'ps','ω':'o'};
-function searchKey(str){
-  let s = String(str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  s = s.replace(/[α-ω]|ς/g, ch => GR2LAT[ch] ?? ch);
-  return s
-    .replace(/th/g,'8').replace(/ch|kh/g,'x').replace(/ks/g,'q')
-    .replace(/h/g,'i').replace(/[yu]/g,'i').replace(/w/g,'o')
-    .replace(/b/g,'v').replace(/c/g,'k').replace(/j/g,'g')
-    .replace(/\s+/g,' ').trim();
-}
-function customerRowHTML(c){
-  return `
+function renderCustomers(){
+  const el = document.getElementById('view-customers');
+  const rows = DATA.customers.map(c=>`
     <tr>
       <td class="mono">${c.id}</td>
       <td><b>${c.name}</b></td>
@@ -635,59 +620,20 @@ function customerRowHTML(c){
         <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
         <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
       </td>
-    </tr>`;
-}
-function renderCustomers(){
-  const el = document.getElementById('view-customers');
+    </tr>
+  `).join('');
   el.innerHTML = `
     <div class="toolbar">
-      <p class="section-title" style="margin:0;" id="customersCount"></p>
+      <p class="section-title" style="margin:0;">Πελάτες (${DATA.customers.length})</p>
       <button class="btn" onclick="openCustomerModal()">+ Νέος πελάτης</button>
-    </div>
-    <div class="field" style="max-width:320px;">
-      <input id="customerSearchInput" type="search" autocomplete="off"
-        placeholder="Αναζήτηση: όνομα, τηλέφωνο, περιοχή…"
-        value="${customerSearch.replace(/"/g,'&quot;')}"
-        oninput="onCustomerSearch(this.value)"
-        onkeydown="if(event.key==='Escape'){this.value='';onCustomerSearch('');}">
     </div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>ID</th><th>Όνομα</th><th>Τηλέφωνο</th><th>Διεύθυνση</th><th>Χάρτης</th><th></th></tr></thead>
-        <tbody id="customersBody"></tbody>
+        <tbody>${rows || `<tr><td colspan="6" class="empty">Δεν υπάρχουν πελάτες ακόμα.</td></tr>`}</tbody>
       </table>
     </div>
   `;
-  fillCustomerRows();
-}
-function onCustomerSearch(val){ customerSearch = val; fillCustomerRows(); }
-function fillCustomerRows(){
-  const body = document.getElementById('customersBody');
-  if(!body) return;
-  const terms = searchKey(customerSearch).split(' ').filter(Boolean);
-  const qDigits = customerSearch.replace(/\D/g,'');
-  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/x/g,'[xq]'); // greeklish x = χ ή ξ
-  const list = DATA.customers.filter(c=>{
-    if(!terms.length) return true;
-    const hay = searchKey([c.id, c.name, c.phone, c.address].join(' '));
-    if(terms.every(t=>new RegExp(esc(t)).test(hay))) return true;
-    return qDigits.length>=3 && /^[\d\s\-+().]+$/.test(customerSearch.trim())
-      && String(c.phone||'').replace(/\D/g,'').includes(qDigits);
-  });
-  const total = DATA.customers.length;
-  document.getElementById('customersCount').textContent =
-    terms.length ? `Πελάτες (${list.length} από ${total})` : `Πελάτες (${total})`;
-  let emptyMsg = 'Δεν υπάρχουν πελάτες ακόμα.';
-  if(total && terms.length){
-    emptyMsg = `Κανένας πελάτης δεν ταιριάζει με «${customerSearch.replace(/[<>&"]/g,'')}». <button class="link-btn" onclick="clearCustomerSearch()">Καθαρισμός αναζήτησης</button>`;
-  }
-  body.innerHTML = list.map(customerRowHTML).join('') || `<tr><td colspan="6" class="empty">${emptyMsg}</td></tr>`;
-}
-function clearCustomerSearch(){
-  customerSearch = '';
-  const inp = document.getElementById('customerSearchInput');
-  if(inp){ inp.value=''; inp.focus(); }
-  fillCustomerRows();
 }
 function nextCustomerId(){
   const nums = DATA.customers.map(c=>parseInt((c.id||'C000').replace('C',''))||0);
@@ -770,16 +716,12 @@ function orderTableHTML(list, key, isCompleted, searchVal){
   const rows = list.map(o=>{
     const total = orderTotal(o);
     const balance = orderBalance(o);
-    const u = o.unit==='Παλέτα'?'παλ.':'σακ.';
-    const delivered = o.deliveredQty ? `${num(o.deliveredQty)} ${u}` : '—';
-    const remainingQty = Math.max(0, (Number(o.quantity)||0) - (Number(o.deliveredQty)||0));
-    const remaining = o.deliveryStatus==='Ακυρώθηκε' ? '—' : `${num(remainingQty)} ${u}`;
+    const delivered = o.deliveredQty ? `${num(o.deliveredQty)} ${o.unit==='Παλέτα'?'παλ.':'σακ.'}` : '—';
     return `<tr>
       <td><b>${customerName(o.customerId)}</b></td>
       <td>${productName(o.productId)}</td>
       <td class="num">${num(o.quantity)} ${o.unit==='Παλέτα'?'παλ.':'σακ.'}</td>
       <td class="num cell-strong">${delivered}</td>
-      <td class="num">${remaining}</td>
       <td class="num">${eur(o.unitPrice)}</td>
       <td class="num">${eur(total)}</td>
       <td>${o.paymentMethod}</td>
@@ -804,10 +746,10 @@ function orderTableHTML(list, key, isCompleted, searchVal){
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>Πελάτης</th><th>Είδος</th><th class="num">Ποσότητα</th><th class="num">Παραδομένη Ποσ.</th><th class="num">Μένει να παραδοθεί</th><th class="num">Τιμή</th>
+          <th>Πελάτης</th><th>Είδος</th><th class="num">Ποσότητα</th><th class="num">Παραδομένη Ποσ.</th><th class="num">Τιμή</th>
           <th class="num">Σύνολο</th><th>Πληρωμή</th><th class="num">Υπόλοιπο</th><th>Κατάσταση</th><th></th>
         </tr></thead>
-        <tbody>${rows || `<tr><td colspan="11" class="empty">Καμία εγγραφή.</td></tr>`}</tbody>
+        <tbody>${rows || `<tr><td colspan="10" class="empty">Καμία εγγραφή.</td></tr>`}</tbody>
       </table>
     </div>
   `;
@@ -825,7 +767,7 @@ function openOrderModal(id){
     <div class="field"><label>Πελάτης</label><select id="f-customer">${custOptions}</select></div>
     <div class="field"><label>Είδος</label><select id="f-product" onchange="autoFillPrice()">${prodOptions}</select></div>
     <div class="field-row">
-      <div class="field"><label>Ποσότητα</label><input id="f-qty" type="number" step="0.01" value="${o?o.quantity:1}"></div>
+      <div class="field"><label>Ποσότητα</label><input id="f-qty" type="number" step="0.01" value="${o?o.quantity:1}" oninput="updateStatusDisplay()"></div>
       <div class="field"><label>Μονάδα</label><select id="f-unit">${unitOptions}</select></div>
     </div>
     <div class="field"><label>Τιμή μονάδας (€)</label><input id="f-uprice" type="number" step="0.01" value="${o?o.unitPrice:''}"></div>
@@ -834,8 +776,16 @@ function openOrderModal(id){
       <div class="field"><label>Ποσό που πληρώθηκε (€)</label><input id="f-paid" type="number" step="0.01" value="${o?o.paidAmount:0}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Κατάσταση παράδοσης</label><select id="f-status">${statusOptions}</select></div>
-      <div class="field"><label>Παραδομένη ποσότητα</label><input id="f-delqty" type="number" step="0.01" value="${o?o.deliveredQty:0}"></div>
+      <div class="field">
+        <label>Κατάσταση παράδοσης</label>
+        <div id="status-display" class="badge ${badgeClass(o?o.deliveryStatus:'Εκκρεμεί')}" style="display:inline-block;padding:8px 12px;">${o?o.deliveryStatus:'Εκκρεμεί'}</div>
+      </div>
+      <div class="field"><label>Παραδομένη ποσότητα</label><input id="f-delqty" type="number" step="0.01" value="${o?o.deliveredQty:0}" oninput="updateStatusDisplay()"></div>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-weight:500;">
+        <input type="checkbox" id="f-cancelled" style="width:auto;" ${o&&o.deliveryStatus==='Ακυρώθηκε'?'checked':''} onchange="updateStatusDisplay()"> Η παραγγελία ακυρώθηκε
+      </label>
     </div>
     <div class="field"><label>Ημ/νία παράδοσης</label><input id="f-deldate" type="date" value="${o&&o.deliveryDate?o.deliveryDate:''}"></div>
     <div class="field"><label>Σημειώσεις</label><textarea id="f-notes" rows="2">${o?o.notes||'':''}</textarea></div>
@@ -859,6 +809,21 @@ function autoFillPrice(){
 document.addEventListener('change', (e)=>{
   if(e.target && e.target.id==='f-unit') autoFillPrice();
 });
+function computeAutoStatus(quantity, deliveredQty, cancelled){
+  if(cancelled) return 'Ακυρώθηκε';
+  if(!deliveredQty || deliveredQty<=0) return 'Εκκρεμεί';
+  if(deliveredQty >= quantity) return 'Παραδόθηκε';
+  return 'Μερική Παράδοση';
+}
+function updateStatusDisplay(){
+  const qty = parseFloat(document.getElementById('f-qty').value)||0;
+  const delQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  const cancelled = document.getElementById('f-cancelled').checked;
+  const status = computeAutoStatus(qty, delQty, cancelled);
+  const disp = document.getElementById('status-display');
+  disp.textContent = status;
+  disp.className = 'badge ' + badgeClass(status);
+}
 async function saveOrder(id){
   const customerId = document.getElementById('f-customer').value;
   const productId = document.getElementById('f-product').value;
@@ -867,8 +832,9 @@ async function saveOrder(id){
   const unitPrice = parseFloat(document.getElementById('f-uprice').value)||0;
   const paymentMethod = document.getElementById('f-pay').value;
   const paidAmount = parseFloat(document.getElementById('f-paid').value)||0;
-  const deliveryStatus = document.getElementById('f-status').value;
   const deliveredQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  const cancelled = document.getElementById('f-cancelled').checked;
+  const deliveryStatus = computeAutoStatus(quantity, deliveredQty, cancelled);
   const deliveryDate = document.getElementById('f-deldate').value || null;
   const notes = document.getElementById('f-notes').value;
   const fields = {customerId, productId, quantity, unit, unitPrice, paymentMethod, paidAmount, deliveryStatus, deliveredQty, deliveryDate, notes};
