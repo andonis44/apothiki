@@ -199,6 +199,28 @@ label{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppe
   .field-row{grid-template-columns:1fr;}
   .hero{flex-direction:column;align-items:flex-start;}
 }
+
+/* ---------- Καρτέλα πελάτη ---------- */
+.cc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.cc-name{font-family:'Fraunces',serif;font-size:26px;font-weight:700;margin:4px 0 6px;}
+.cc-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:13.5px;color:var(--ink-soft);}
+.cc-orders{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:24px;}
+.cc-order{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--pine);border-radius:6px;padding:16px;box-shadow:var(--shadow);}
+.cc-order.done{border-left-color:var(--birch);}
+.cc-order .prod{font-family:'Fraunces',serif;font-size:19px;font-weight:700;margin:0;}
+.cc-progress{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;margin:10px 0 2px;}
+.cc-progress small{font-size:14px;color:var(--ink-soft);}
+.cc-remain{font-size:13px;color:var(--ink-soft);margin-bottom:12px;}
+.cc-remain b{color:var(--rust-deep);}
+.big-btn{display:block;width:100%;font-size:20px;font-weight:700;padding:16px 10px;border-radius:8px;border:none;background:var(--pine);color:#fff;margin-bottom:8px;touch-action:manipulation;}
+.big-btn:active{transform:scale(.98);background:var(--pine-deep);}
+.big-btn:disabled{background:var(--line);color:var(--ink-soft);}
+.cc-btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+.cc-btn-row .btn{flex:1;padding:10px 8px;}
+.cc-log{font-size:12px;color:var(--ink-soft);margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;}
+.orders-pill{display:inline-block;background:var(--pine);color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:4px;}
+.name-link{background:none;border:none;padding:0;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;}
+.name-link:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -231,6 +253,7 @@ label{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppe
   <div class="view" id="view-orders"></div>
   <div class="view" id="view-completed"></div>
   <div class="view" id="view-slip"></div>
+  <div class="view" id="view-customer"></div>
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop">
@@ -489,6 +512,7 @@ function renderView(view){
   if(view==='orders') renderOrders();
   if(view==='completed') renderCompleted();
   if(view==='slip') renderSlip();
+  if(view==='customer') renderCustomerCard();
 }
 
 /* ============================= DASHBOARD ============================= */
@@ -627,12 +651,12 @@ function customerRowHTML(c){
   return `
     <tr>
       <td class="mono">${c.id}</td>
-      <td><b>${c.name}</b></td>
+      <td><button class="name-link" onclick="openCustomerCard('${c.id}')">${c.name} ›</button>${customerOrdersButton(c)?`<div style="margin-top:4px;">${customerOrdersButton(c)}</div>`:''}</td>
       <td>${c.phone? `<a href="tel:${c.phone}" class="link-btn">${c.phone}</a>` : '—'}</td>
       <td>${c.address||'—'}</td>
       <td>${c.mapsLink? `<a href="${c.mapsLink}" target="_blank" class="link-btn">Χάρτης ↗</a>` : '—'}</td>
       <td style="white-space:nowrap;">
-        <button class="btn small" title="Νέα παραγγελία για αυτόν τον πελάτη" onclick="newOrderForCustomer('${c.id}')">+ Παραγγελία</button>
+        <button class="btn small secondary" title="Νέα παραγγελία για αυτόν τον πελάτη" onclick="newOrderForCustomer('${c.id}')">+ Παραγγελία</button>
         <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
         <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
       </td>
@@ -781,7 +805,7 @@ async function saveCustomer(id, force){
   }
   await saveData();
   closeModal();
-  renderCustomers();
+  if(currentView==='customer') renderCustomerCard(); else renderCustomers();
   showToast('Αποθηκεύτηκε.');
 }
 async function deleteCustomer(id){
@@ -837,7 +861,7 @@ function orderTableHTML(list, key, isCompleted, searchVal){
     const remainingQty = Math.max(0, (Number(o.quantity)||0) - (Number(o.deliveredQty)||0));
     const remaining = o.deliveryStatus==='Ακυρώθηκε' ? '—' : `${num(remainingQty)} ${u}`;
     return `<tr>
-      <td><b>${customerName(o.customerId)}</b></td>
+      <td><button class="name-link" title="Καρτέλα πελάτη" onclick="openCustomerCard('${o.customerId}')">${customerName(o.customerId)}</button></td>
       <td>${productName(o.productId)}</td>
       <td class="num">${num(o.quantity)} ${o.unit==='Παλέτα'?'παλ.':'σακ.'}</td>
       <td class="num cell-strong">${delivered}</td>
@@ -945,6 +969,7 @@ async function saveOrder(id){
     if(deliveryStatus === 'Παραδόθηκε' && deliveredQty <= 0) deliveredQty = quantity;
     else if(quantity > 0 && deliveredQty >= quantity) deliveryStatus = 'Παραδόθηκε';
     else if(deliveredQty > 0 && deliveryStatus === 'Εκκρεμεί') deliveryStatus = 'Μερική Παράδοση';
+    else if(deliveredQty <= 0 && deliveryStatus === 'Μερική Παράδοση') deliveryStatus = 'Εκκρεμεί';
   }
   const deliveryDate = document.getElementById('f-deldate').value || null;
   const notes = document.getElementById('f-notes').value;
@@ -957,14 +982,14 @@ async function saveOrder(id){
   }
   await saveData();
   closeModal();
-  renderOrders(); renderCompleted(); renderDashboard();
+  refreshOrderViews();
   showToast('Αποθηκεύτηκε.');
 }
 async function deleteOrder(id){
   if(!confirm('Διαγραφή παραγγελίας;')) return;
   DATA.orders = DATA.orders.filter(o=>o.id!==id);
   await saveData();
-  renderOrders(); renderCompleted(); renderDashboard();
+  refreshOrderViews();
 }
 
 /* ---- Quick payment ---- */
@@ -993,8 +1018,148 @@ async function confirmPayment(id){
   o.paidAmount = (Number(o.paidAmount)||0) + amount;
   await saveData();
   closeModal();
-  renderOrders(); renderCompleted(); renderDashboard();
+  refreshOrderViews();
   showToast('Η πληρωμή καταχωρήθηκε.');
+}
+
+/* ============================= ΚΑΡΤΕΛΑ ΠΕΛΑΤΗ ============================= */
+let cardCustomerId = null;
+function customerOrders(cid){ return DATA.orders.filter(o=>o.customerId===cid); }
+function customerOrdersButton(c){
+  const all = customerOrders(c.id);
+  if(!all.length) return '';
+  const active = all.filter(o=>!isOrderCompleted(o)).length;
+  return `<button class="btn small" style="white-space:nowrap;" title="Καρτέλα πελάτη με όλες τις παραγγελίες" onclick="openCustomerCard('${c.id}')">📋 Καρτέλα${active?`<span class="orders-pill">${active}</span>`:''}</button>`;
+}
+function refreshOrderViews(){
+  renderOrders(); renderCompleted(); renderDashboard();
+  if(currentView==='customer') renderCustomerCard();
+  if(currentView==='customers') fillCustomerRows();
+}
+function openCustomerCard(cid){
+  cardCustomerId = cid;
+  currentView = 'customer';
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.view==='customers'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-customer').classList.add('active');
+  renderCustomerCard();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function backToCustomers(){ document.querySelector('.tab[data-view="customers"]').click(); }
+function unitShort(o, n){ return o.unit==='Παλέτα' ? (n===1?'παλέτα':'παλέτες') : (n===1?'σακί':'σακιά'); }
+function fmtDate(d){ if(!d) return ''; const [y,m,dd]=String(d).slice(0,10).split('-'); return dd&&m ? `${dd}/${m}/${y}` : d; }
+
+function renderCustomerCard(){
+  const el = document.getElementById('view-customer');
+  const c = DATA.customers.find(x=>x.id===cardCustomerId);
+  if(!c){ el.innerHTML = '<div class="empty">Ο πελάτης δεν βρέθηκε.</div>'; return; }
+  const all = customerOrders(c.id);
+  const active = all.filter(o=>!isOrderCompleted(o));
+  const done = all.filter(o=>isOrderCompleted(o));
+  let totBalance=0, totRemainPal=0, totValue=0;
+  all.forEach(o=>{
+    if(o.deliveryStatus==='Ακυρώθηκε') return;
+    totValue += orderTotal(o);
+    totBalance += orderBalance(o);
+    const rem = Math.max(0,(Number(o.quantity)||0)-(Number(o.deliveredQty)||0));
+    totRemainPal += o.unit==='Παλέτα' ? rem : 0;
+  });
+
+  const activeCards = active.map(o=>{
+    const q = Number(o.quantity)||0, d = Number(o.deliveredQty)||0;
+    const rem = Math.max(0, q-d);
+    const bal = orderBalance(o);
+    const log = (o.deliveries||[]).slice(-5).reverse()
+      .map(x=>`${fmtDate(x.date)}: +${num(x.qty)} ${unitShort(o,x.qty)}`).join(' · ');
+    return `
+    <div class="cc-order">
+      <p class="prod">${productName(o.productId)}</p>
+      <div style="font-size:12px;color:var(--ink-soft);">${o.date?`Παραγγελία ${fmtDate(o.date)} · `:''}${eur(o.unitPrice)} / ${o.unit.toLowerCase()} · <span class="badge ${badgeClass(o.deliveryStatus)}">${o.deliveryStatus}</span></div>
+      <div class="cc-progress">${num(d)} <small>/ ${num(q)} ${unitShort(o,q)} παραδόθηκαν</small></div>
+      <div class="cc-remain">${rem>0?`Μένουν <b>${num(rem)} ${unitShort(o,rem)}</b>`:'Παραδόθηκε όλη η ποσότητα'} · Υπόλοιπο: ${bal>0.009?`<b>${eur(bal)}</b>`:'εξοφλημένο'}</div>
+      ${rem>0 ? `<button class="big-btn" onclick="quickDeliver('${o.id}',1)">✚ Πήγα 1 ${unitShort(o,1)}</button>` : ''}
+      <div class="cc-btn-row">
+        ${rem>1 ? `<button class="btn secondary" onclick="quickDeliver('${o.id}',${rem})">Πήγα όλες (${num(rem)})</button>` : ''}
+        ${d>0 ? `<button class="btn secondary" title="Αναίρεση τελευταίας παράδοσης" onclick="undoDeliver('${o.id}')">↶ −1</button>` : ''}
+        ${bal>0.009 ? `<button class="btn secondary" onclick="openPaymentModal('${o.id}')">💳 Πληρωμή</button>` : ''}
+        <button class="btn secondary" onclick="openOrderModal('${o.id}')">✎</button>
+      </div>
+      ${log?`<div class="cc-log">Παραδόσεις: ${log}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const doneRows = done.map(o=>`<tr>
+      <td>${productName(o.productId)}</td>
+      <td class="num">${num(o.quantity)} ${unitShort(o,o.quantity)}</td>
+      <td class="num">${eur(orderTotal(o))}</td>
+      <td>${fmtDate(o.deliveryDate)||fmtDate(o.date)||'—'}</td>
+      <td><span class="badge ${badgeClass(o.deliveryStatus)}">${o.deliveryStatus}</span></td>
+      <td><button class="icon-btn" onclick="openOrderModal('${o.id}')">✎</button></td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <button class="link-btn" onclick="backToCustomers()">← Πίσω στους πελάτες</button>
+    <div class="cc-head">
+      <div>
+        <div class="cc-name">${c.name}</div>
+        <div class="cc-meta">
+          ${c.phone?`<a href="tel:${c.phone}" class="link-btn">📞 ${c.phone}</a>`:''}
+          ${c.address?`<span>📍 ${c.address}</span>`:''}
+          ${c.mapsLink?`<a href="${c.mapsLink}" target="_blank" class="link-btn">Χάρτης ↗</a>`:''}
+          <button class="link-btn" onclick="openCustomerModal('${c.id}')">✎ Στοιχεία</button>
+        </div>
+      </div>
+      <button class="btn" onclick="openOrderModal(null,'${c.id}')">+ Νέα παραγγελία</button>
+    </div>
+    <div class="summary-strip">
+      <div class="summary-item"><div class="label">Ενεργές παραγγελίες</div><div class="value">${active.length}</div></div>
+      <div class="summary-item"><div class="label">Μένουν να πάνε</div><div class="value">${num(totRemainPal)} παλ.</div></div>
+      <div class="summary-item"><div class="label">Σύνολο αγορών</div><div class="value">${eur(totValue)}</div></div>
+      <div class="summary-item"><div class="label">Χρωστάει</div><div class="value ${totBalance>0.009?'rust':'pine'}">${eur(Math.max(0,totBalance))}</div></div>
+    </div>
+    <p class="section-title">Ενεργές παραγγελίες</p>
+    ${activeCards ? `<div class="cc-orders">${activeCards}</div>` : `<div class="card empty" style="margin-bottom:24px;">Καμία ενεργή παραγγελία. <button class="link-btn" onclick="openOrderModal(null,'${c.id}')">+ Νέα παραγγελία</button></div>`}
+    <p class="section-title">Ιστορικό (ολοκληρωμένες)</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Είδος</th><th class="num">Ποσότητα</th><th class="num">Σύνολο</th><th>Ημ/νία</th><th>Κατάσταση</th><th></th></tr></thead>
+        <tbody>${doneRows || `<tr><td colspan="6" class="empty">Δεν υπάρχουν ακόμα.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
+}
+function syncStatus(o){
+  if(o.deliveryStatus==='Ακυρώθηκε') return;
+  const q = Number(o.quantity)||0, d = Number(o.deliveredQty)||0;
+  if(q>0 && d>=q) o.deliveryStatus = 'Παραδόθηκε';
+  else if(d>0) o.deliveryStatus = 'Μερική Παράδοση';
+  else o.deliveryStatus = 'Εκκρεμεί';
+}
+async function quickDeliver(id, qty){
+  const o = DATA.orders.find(x=>x.id===id);
+  if(!o || !dataSynced){ showToast('Δεν υπάρχει σύνδεση — δεν καταχωρήθηκε.'); return; }
+  const today = new Date().toISOString().slice(0,10);
+  o.deliveredQty = round2((Number(o.deliveredQty)||0) + qty);
+  o.deliveries = o.deliveries || [];
+  o.deliveries.push({date:today, qty});
+  o.deliveryDate = today;
+  syncStatus(o);
+  refreshOrderViews();
+  showToast(`✔ +${num(qty)} ${unitShort(o,qty)} — ${productName(o.productId)}`);
+  await saveData();
+}
+async function undoDeliver(id){
+  const o = DATA.orders.find(x=>x.id===id);
+  if(!o) return;
+  const last = (o.deliveries||[]).length ? o.deliveries[o.deliveries.length-1] : null;
+  const qty = last ? last.qty : 1;
+  if(!confirm(`Αναίρεση παράδοσης ${num(qty)} ${unitShort(o,qty)};`)) return;
+  if(last) o.deliveries.pop();
+  o.deliveredQty = Math.max(0, round2((Number(o.deliveredQty)||0) - qty));
+  syncStatus(o);
+  refreshOrderViews();
+  showToast('Αναιρέθηκε.');
+  await saveData();
 }
 
 /* ============================= DELIVERY SLIP ============================= */
