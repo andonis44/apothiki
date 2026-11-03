@@ -650,13 +650,13 @@ function searchKey(str){
 function customerRowHTML(c){
   return `
     <tr>
+      <td style="white-space:nowrap;">${customerOrdersButton(c) || `<button class="btn small secondary" style="white-space:nowrap;" title="Νέα παραγγελία για αυτόν τον πελάτη" onclick="newOrderForCustomer('${c.id}')">+ Παραγγελία</button>`}</td>
       <td class="mono">${c.id}</td>
-      <td><button class="name-link" onclick="openCustomerCard('${c.id}')">${c.name} ›</button>${customerOrdersButton(c)?`<div style="margin-top:4px;">${customerOrdersButton(c)}</div>`:''}</td>
+      <td><button class="name-link" onclick="openCustomerCard('${c.id}')">${c.name} ›</button></td>
       <td>${c.phone? `<a href="tel:${c.phone}" class="link-btn">${c.phone}</a>` : '—'}</td>
       <td>${c.address||'—'}</td>
       <td>${c.mapsLink? `<a href="${c.mapsLink}" target="_blank" class="link-btn">Χάρτης ↗</a>` : '—'}</td>
       <td style="white-space:nowrap;">
-        <button class="btn small secondary" title="Νέα παραγγελία για αυτόν τον πελάτη" onclick="newOrderForCustomer('${c.id}')">+ Παραγγελία</button>
         <button class="icon-btn" onclick="openCustomerModal('${c.id}')">✎</button>
         <button class="icon-btn" onclick="deleteCustomer('${c.id}')">🗑</button>
       </td>
@@ -678,7 +678,7 @@ function renderCustomers(){
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Όνομα</th><th>Τηλέφωνο</th><th>Διεύθυνση</th><th>Χάρτης</th><th></th></tr></thead>
+        <thead><tr><th></th><th>ID</th><th>Όνομα</th><th>Τηλέφωνο</th><th>Διεύθυνση</th><th>Χάρτης</th><th></th></tr></thead>
         <tbody id="customersBody"></tbody>
       </table>
     </div>
@@ -706,7 +706,7 @@ function fillCustomerRows(){
   if(total && terms.length){
     emptyMsg = `Κανένας πελάτης δεν ταιριάζει με «${customerSearch.replace(/[<>&"]/g,'')}». <button class="link-btn" onclick="clearCustomerSearch()">Καθαρισμός αναζήτησης</button>`;
   }
-  body.innerHTML = list.map(customerRowHTML).join('') || `<tr><td colspan="6" class="empty">${emptyMsg}</td></tr>`;
+  body.innerHTML = list.map(customerRowHTML).join('') || `<tr><td colspan="7" class="empty">${emptyMsg}</td></tr>`;
 }
 function clearCustomerSearch(){
   customerSearch = '';
