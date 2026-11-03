@@ -795,10 +795,15 @@ async function deleteCustomer(id){
 let orderSearchQuery = '';
 let completedSearchQuery = '';
 
+function isFullyDelivered(o){
+  if(o.deliveryStatus === 'Παραδόθηκε') return true;
+  const q = Number(o.quantity)||0, d = Number(o.deliveredQty)||0;
+  return q > 0 && d >= q - 0.001;
+}
 function isOrderCompleted(o){
   if(o.deliveryStatus === 'Ακυρώθηκε') return true;
-  if(o.deliveryStatus === 'Παραδόθηκε' && orderBalance(o) <= 0) return true;
-  return false;
+  // Ολοκληρωμένη = παραδόθηκε όλη η ποσότητα ΚΑΙ εξοφλήθηκε (ανοχή 1 λεπτού για στρογγυλοποιήσεις)
+  return isFullyDelivered(o) && orderBalance(o) < 0.01;
 }
 function matchesSearch(o, q){
   if(!q) return true;
@@ -933,8 +938,14 @@ async function saveOrder(id){
   const unitPrice = parseFloat(document.getElementById('f-uprice').value)||0;
   const paymentMethod = document.getElementById('f-pay').value;
   const paidAmount = parseFloat(document.getElementById('f-paid').value)||0;
-  const deliveryStatus = document.getElementById('f-status').value;
-  const deliveredQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  let deliveryStatus = document.getElementById('f-status').value;
+  let deliveredQty = parseFloat(document.getElementById('f-delqty').value)||0;
+  // Αυτόματος συγχρονισμός κατάστασης με την παραδομένη ποσότητα
+  if(deliveryStatus !== 'Ακυρώθηκε'){
+    if(deliveryStatus === 'Παραδόθηκε' && deliveredQty <= 0) deliveredQty = quantity;
+    else if(quantity > 0 && deliveredQty >= quantity) deliveryStatus = 'Παραδόθηκε';
+    else if(deliveredQty > 0 && deliveryStatus === 'Εκκρεμεί') deliveryStatus = 'Μερική Παράδοση';
+  }
   const deliveryDate = document.getElementById('f-deldate').value || null;
   const notes = document.getElementById('f-notes').value;
   const fields = {customerId, productId, quantity, unit, unitPrice, paymentMethod, paidAmount, deliveryStatus, deliveredQty, deliveryDate, notes};
