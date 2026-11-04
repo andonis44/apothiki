@@ -217,6 +217,10 @@ label{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppe
 .big-btn:disabled{background:var(--line);color:var(--ink-soft);}
 .cc-btn-row{display:flex;gap:6px;flex-wrap:wrap;}
 .cc-btn-row .btn{flex:1;padding:10px 8px;}
+.bag-row{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.bag-label{font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-right:2px;}
+.bag-btn{flex:1;min-width:56px;font-size:17px;font-weight:700;padding:12px 6px;border-radius:8px;border:2px solid var(--pine);background:var(--surface);color:var(--pine-deep);touch-action:manipulation;}
+.bag-btn:active{background:var(--surface-2);transform:scale(.97);}
 .cc-log{font-size:12px;color:var(--ink-soft);margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;}
 .orders-pill{display:inline-block;background:var(--pine);color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:4px;}
 .name-link{background:none;border:none;padding:0;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;}
@@ -857,9 +861,9 @@ function orderTableHTML(list, key, isCompleted, searchVal){
     const total = orderTotal(o);
     const balance = orderBalance(o);
     const u = o.unit==='Παλέτα'?'παλ.':'σακ.';
-    const delivered = o.deliveredQty ? `${num(o.deliveredQty)} ${u}` : '—';
-    const remainingQty = Math.max(0, (Number(o.quantity)||0) - (Number(o.deliveredQty)||0));
-    const remaining = o.deliveryStatus==='Ακυρώθηκε' ? '—' : `${num(remainingQty)} ${u}`;
+    const delivered = o.deliveredQty ? fmtQ(o, o.deliveredQty, true) : '—';
+    const remainingQty = Math.max(0, snapQty(o, (Number(o.quantity)||0) - (Number(o.deliveredQty)||0)));
+    const remaining = o.deliveryStatus==='Ακυρώθηκε' ? '—' : fmtQ(o, remainingQty, true);
     return `<tr>
       <td><button class="name-link" title="Καρτέλα πελάτη" onclick="openCustomerCard('${o.customerId}')">${customerName(o.customerId)}</button></td>
       <td>${productName(o.productId)}</td>
@@ -1047,6 +1051,30 @@ function openCustomerCard(cid){
 }
 function backToCustomers(){ document.querySelector('.tab[data-view="customers"]').click(); }
 function unitShort(o, n){ return o.unit==='Παλέτα' ? (n===1?'παλέτα':'παλέτες') : (n===1?'σακί':'σακιά'); }
+/* Σακιά ανά παλέτα για παραγγελία σε παλέτες (0 αν δεν ορίζεται) */
+function bppOf(o){
+  if(o.unit!=='Παλέτα') return 0;
+  const p = productById(o.productId);
+  return p && Number(p.bagsPerPallet) > 0 ? Number(p.bagsPerPallet) : 0;
+}
+/* Στρογγυλοποίηση σε ακέραια σακιά, για να μη μαζεύονται δεκαδικά λάθη */
+function snapQty(o, v){
+  const bpp = bppOf(o);
+  return bpp ? Math.round(v*bpp)/bpp : Math.round(v*100)/100;
+}
+/* Εμφάνιση ποσότητας: π.χ. "1 παλέτα + 20 σακιά" */
+function fmtQ(o, v, short){
+  v = Number(v)||0;
+  const bpp = bppOf(o);
+  const P = n => short ? 'παλ.' : (n===1?'παλέτα':'παλέτες');
+  const S = n => short ? 'σακ.' : (n===1?'σακί':'σακιά');
+  if(!bpp) return `${num(v)} ${short ? (o.unit==='Παλέτα'?'παλ.':'σακ.') : unitShort(o,v)}`;
+  const totalBags = Math.round(v*bpp);
+  const full = Math.floor(totalBags/bpp), r = totalBags % bpp;
+  if(full && r) return `${full} ${P(full)} + ${r} ${S(r)}`;
+  if(r) return `${r} ${S(r)}`;
+  return `${full} ${P(full)}`;
+}
 function fmtDate(d){ if(!d) return ''; const [y,m,dd]=String(d).slice(0,10).split('-'); return dd&&m ? `${dd}/${m}/${y}` : d; }
 
 function renderCustomerCard(){
@@ -1067,20 +1095,33 @@ function renderCustomerCard(){
 
   const activeCards = active.map(o=>{
     const q = Number(o.quantity)||0, d = Number(o.deliveredQty)||0;
-    const rem = Math.max(0, q-d);
+    const rem = Math.max(0, snapQty(o, q-d));
+    const bpp = bppOf(o);
+    const remBags = bpp ? Math.round(rem*bpp) : 0;
     const bal = orderBalance(o);
-    const log = (o.deliveries||[]).slice(-5).reverse()
-      .map(x=>`${fmtDate(x.date)}: +${num(x.qty)} ${unitShort(o,x.qty)}`).join(' · ');
+    const log = (o.deliveries||[]).slice(-6).reverse()
+      .map(x=>`${fmtDate(x.date)}: +${x.bags ? `${x.bags} ${x.bags===1?'σακί':'σακιά'}` : fmtQ(o,x.qty)}`).join(' · ');
+    const mainBtn = rem <= 0 ? '' :
+      (rem >= 1 - 1e-6
+        ? `<button class="big-btn" onclick="quickDeliver('${o.id}',1)">✚ Πήγα 1 ${unitShort(o,1)}</button>`
+        : `<button class="big-btn" onclick="quickDeliver('${o.id}',${rem})">✚ Πήγα τα υπόλοιπα (${fmtQ(o,rem)})</button>`);
+    const bagBtns = (bpp && rem > 0) ? `
+      <div class="bag-row">
+        <span class="bag-label">Σακιά:</span>
+        ${[1,5,10].filter(n=>n<=remBags).map(n=>`<button class="bag-btn" onclick="deliverBags('${o.id}',${n})">+${n}</button>`).join('')}
+        <button class="bag-btn" onclick="deliverBagsAsk('${o.id}')">Άλλο…</button>
+      </div>` : '';
     return `
     <div class="cc-order">
       <p class="prod">${productName(o.productId)}</p>
       <div style="font-size:12px;color:var(--ink-soft);">${o.date?`Παραγγελία ${fmtDate(o.date)} · `:''}${eur(o.unitPrice)} / ${o.unit.toLowerCase()} · <span class="badge ${badgeClass(o.deliveryStatus)}">${o.deliveryStatus}</span></div>
-      <div class="cc-progress">${num(d)} <small>/ ${num(q)} ${unitShort(o,q)} παραδόθηκαν</small></div>
-      <div class="cc-remain">${rem>0?`Μένουν <b>${num(rem)} ${unitShort(o,rem)}</b>`:'Παραδόθηκε όλη η ποσότητα'} · Υπόλοιπο: ${bal>0.009?`<b>${eur(bal)}</b>`:'εξοφλημένο'}</div>
-      ${rem>0 ? `<button class="big-btn" onclick="quickDeliver('${o.id}',1)">✚ Πήγα 1 ${unitShort(o,1)}</button>` : ''}
+      <div class="cc-progress">${fmtQ(o,d)} <small>από ${fmtQ(o,q)} παραδόθηκαν</small></div>
+      <div class="cc-remain">${rem>0?`Μένουν <b>${fmtQ(o,rem)}</b>${bpp?` (${remBags} σακιά)`:''}`:'Παραδόθηκε όλη η ποσότητα'} · Υπόλοιπο: ${bal>0.009?`<b>${eur(bal)}</b>`:'εξοφλημένο'}</div>
+      ${mainBtn}
+      ${bagBtns}
       <div class="cc-btn-row">
-        ${rem>1 ? `<button class="btn secondary" onclick="quickDeliver('${o.id}',${rem})">Πήγα όλες (${num(rem)})</button>` : ''}
-        ${d>0 ? `<button class="btn secondary" title="Αναίρεση τελευταίας παράδοσης" onclick="undoDeliver('${o.id}')">↶ −1</button>` : ''}
+        ${rem>1 ? `<button class="btn secondary" onclick="quickDeliver('${o.id}',${rem})">Πήγα όλα (${fmtQ(o,rem,true)})</button>` : ''}
+        ${d>0 ? `<button class="btn secondary" title="Αναίρεση τελευταίας παράδοσης" onclick="undoDeliver('${o.id}')">↶ Αναίρεση</button>` : ''}
         ${bal>0.009 ? `<button class="btn secondary" onclick="openPaymentModal('${o.id}')">💳 Πληρωμή</button>` : ''}
         <button class="btn secondary" onclick="openOrderModal('${o.id}')">✎</button>
       </div>
@@ -1090,7 +1131,7 @@ function renderCustomerCard(){
 
   const doneRows = done.map(o=>`<tr>
       <td>${productName(o.productId)}</td>
-      <td class="num">${num(o.quantity)} ${unitShort(o,o.quantity)}</td>
+      <td class="num">${fmtQ(o,o.quantity)}</td>
       <td class="num">${eur(orderTotal(o))}</td>
       <td>${fmtDate(o.deliveryDate)||fmtDate(o.date)||'—'}</td>
       <td><span class="badge ${badgeClass(o.deliveryStatus)}">${o.deliveryStatus}</span></td>
@@ -1131,31 +1172,56 @@ function renderCustomerCard(){
 function syncStatus(o){
   if(o.deliveryStatus==='Ακυρώθηκε') return;
   const q = Number(o.quantity)||0, d = Number(o.deliveredQty)||0;
-  if(q>0 && d>=q) o.deliveryStatus = 'Παραδόθηκε';
+  if(q>0 && d>=q-1e-6) o.deliveryStatus = 'Παραδόθηκε';
   else if(d>0) o.deliveryStatus = 'Μερική Παράδοση';
   else o.deliveryStatus = 'Εκκρεμεί';
 }
-async function quickDeliver(id, qty){
+async function quickDeliver(id, qty, bags){
   const o = DATA.orders.find(x=>x.id===id);
   if(!o || !dataSynced){ showToast('Δεν υπάρχει σύνδεση — δεν καταχωρήθηκε.'); return; }
   const today = new Date().toISOString().slice(0,10);
-  o.deliveredQty = round2((Number(o.deliveredQty)||0) + qty);
+  const before = Number(o.deliveredQty)||0;
+  o.deliveredQty = snapQty(o, before + qty);
   o.deliveries = o.deliveries || [];
-  o.deliveries.push({date:today, qty});
+  const entry = {date:today, qty};
+  if(bags) entry.bags = bags;
+  o.deliveries.push(entry);
   o.deliveryDate = today;
   syncStatus(o);
   refreshOrderViews();
-  showToast(`✔ +${num(qty)} ${unitShort(o,qty)} — ${productName(o.productId)}`);
+  const what = bags ? `${bags} ${bags===1?'σακί':'σακιά'}` : fmtQ(o, qty);
+  const fullBefore = Math.floor(before + 1e-6), fullAfter = Math.floor(o.deliveredQty + 1e-6);
+  if(bags && fullAfter > fullBefore){
+    showToast(`🎉 Συμπληρώθηκε παλέτα! Σύνολο: ${fmtQ(o, o.deliveredQty)}`);
+  } else {
+    showToast(`✔ +${what} — ${productName(o.productId)} (σύνολο ${fmtQ(o, o.deliveredQty)})`);
+  }
   await saveData();
+}
+function deliverBags(id, n){
+  const o = DATA.orders.find(x=>x.id===id);
+  const bpp = o ? bppOf(o) : 0;
+  if(!bpp){ showToast('Όρισε «Σακιά/παλέτα» στο είδος (Αποθήκη).'); return; }
+  const remBags = Math.round(Math.max(0, (Number(o.quantity)||0) - (Number(o.deliveredQty)||0)) * bpp);
+  if(n > remBags && !confirm(`Μένουν μόνο ${remBags} σακιά. Να καταχωρηθούν ${n};`)) return;
+  quickDeliver(id, n/bpp, n);
+}
+function deliverBagsAsk(id){
+  const v = prompt('Πόσα σακιά πήγες;');
+  if(v===null) return;
+  const n = parseInt(v,10);
+  if(!(n>0)){ showToast('Βάλε αριθμό σακιών.'); return; }
+  deliverBags(id, n);
 }
 async function undoDeliver(id){
   const o = DATA.orders.find(x=>x.id===id);
   if(!o) return;
   const last = (o.deliveries||[]).length ? o.deliveries[o.deliveries.length-1] : null;
   const qty = last ? last.qty : 1;
-  if(!confirm(`Αναίρεση παράδοσης ${num(qty)} ${unitShort(o,qty)};`)) return;
+  const what = last && last.bags ? `${last.bags} ${last.bags===1?'σακί':'σακιά'}` : fmtQ(o, qty);
+  if(!confirm(`Αναίρεση παράδοσης ${what};`)) return;
   if(last) o.deliveries.pop();
-  o.deliveredQty = Math.max(0, round2((Number(o.deliveredQty)||0) - qty));
+  o.deliveredQty = Math.max(0, snapQty(o, (Number(o.deliveredQty)||0) - qty));
   syncStatus(o);
   refreshOrderViews();
   showToast('Αναιρέθηκε.');
